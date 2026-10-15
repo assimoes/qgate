@@ -1,0 +1,12 @@
+{
+  "hundredths": {
+    "Overall": 7600,
+    "Categories": {
+      "maintainability": null,
+      "quality": null,
+      "security": 7600,
+      "testing": null
+    }
+  },
+  "reported_security": 76
+}

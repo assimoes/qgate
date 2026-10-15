@@ -168,26 +168,91 @@ func TestScoreReproducesASavedReport(t *testing.T) {
 	}
 }
 
-func TestScoreDetectsATamperedReport(t *testing.T) {
+// scoreSaved writes report bytes to a fresh directory and re-scores them.
+func scoreSaved(t *testing.T, report []byte) clitest.Result {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "r.json"), report, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return clitest.Run(t, clitest.Options{Dir: dir}, "score", "--report", "r.json")
+}
+
+func TestScoreAcceptsAReEncodedReport(t *testing.T) {
 	t.Parallel()
 	repo, base := gateRepo(t, "    enforcement: blocking\n    gate: { max_new: { high: 0 } }\n")
 	run := clitest.Run(t, clitest.Options{Dir: repo.Dir}, "run", "--base", base)
 
+	// Decoding into maps and re-encoding reorders keys and drops
+	// indentation, as jq -S or another tool might, without changing content.
 	var report map[string]any
 	if err := json.Unmarshal(run.Report, &report); err != nil {
 		t.Fatal(err)
 	}
-	for _, f := range report["findings"].([]any) {
-		f.(map[string]any)["severity"] = "low" // hide the high findings
+	reencoded, _ := json.Marshal(report)
+	if res := scoreSaved(t, reencoded); res.Code != 1 {
+		t.Errorf("exit code = %d, want 1 (the gate fails, the report is intact); stderr:\n%s", res.Code, res.Stderr)
 	}
-	tampered, _ := json.Marshal(report)
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "r.json"), tampered, 0o600); err != nil {
+}
+
+func TestScoreDetectsTampering(t *testing.T) {
+	t.Parallel()
+	repo, base := gateRepo(t, "    enforcement: blocking\n    gate: { max_new: { high: 0 } }\n")
+	run := clitest.Run(t, clitest.Options{Dir: repo.Dir}, "run", "--base", base)
+	if run.Code != 1 {
+		t.Fatalf("run exit code = %d, want 1", run.Code)
+	}
+	original := string(run.Report)
+
+	tests := []struct {
+		name  string
+		edit  func(string) string
+		wants string
+	}{
+		{"a finding's severity", func(r string) string {
+			return strings.Replace(r, `"severity": "high"`, `"severity": "low"`, 1)
+		}, "do not match"},
+		{"enforcement and outcome together", func(r string) string {
+			r = strings.ReplaceAll(r, `"enforcement": "blocking"`, `"enforcement": "advisory"`)
+			return strings.Replace(r, `"outcome": "fail"`, `"outcome": "warn"`, 1)
+		}, "config_hash"},
+		{"the scoring section", func(r string) string {
+			return strings.Replace(r, `"agent_max_penalty": 15`, `"agent_max_penalty": 99`, 1)
+		}, "config_hash"},
+		{"degraded hidden while an input failed", func(r string) string {
+			return strings.Replace(r, `"status": "ok"`, `"status": "failed"`, 1)
+		}, "degraded"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			edited := tt.edit(original)
+			if edited == original {
+				t.Fatal("the edit did not apply; the fixture changed")
+			}
+			res := scoreSaved(t, []byte(edited))
+			if res.Code != 3 || !strings.Contains(res.Stderr, tt.wants) {
+				t.Errorf("exit code = %d, want 3 mentioning %q; stderr:\n%s", res.Code, tt.wants, res.Stderr)
+			}
+		})
+	}
+}
+
+func TestScoringSectionMustMatchTheConfig(t *testing.T) {
+	t.Parallel()
+	repo, base := gateRepo(t, "    enforcement: advisory\n")
+	run := clitest.Run(t, clitest.Options{Dir: repo.Dir}, "run", "--base", base)
+	var report map[string]any
+	if err := json.Unmarshal(run.Report, &report); err != nil {
 		t.Fatal(err)
 	}
-	res := clitest.Run(t, clitest.Options{Dir: dir}, "score", "--report", "r.json")
-	if res.Code != 3 || !strings.Contains(res.Stderr, "do not match") {
-		t.Errorf("exit code = %d, want 3 reporting a mismatch; stderr:\n%s", res.Code, res.Stderr)
+	// Change only the report's scoring section, leaving resolved_config
+	// and config_hash consistent with each other.
+	report["scoring"].(map[string]any)["params"].(map[string]any)["agent_weight_pct"] = 99
+	edited, _ := json.Marshal(report)
+	res := scoreSaved(t, edited)
+	if res.Code != 3 || !strings.Contains(res.Stderr, "scoring") {
+		t.Errorf("exit code = %d, want 3 about the scoring section; stderr:\n%s", res.Code, res.Stderr)
 	}
 }
 
@@ -209,5 +274,18 @@ func TestScoreReportErrors(t *testing.T) {
 		if res.Code != tt.code {
 			t.Errorf("%v: exit code = %d, want %d; stderr:\n%s", tt.args, res.Code, tt.code, res.Stderr)
 		}
+	}
+}
+
+func TestCategoryWeightsMustNotAllBeZero(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writeRepoConfig(t, dir, ".qgate.yaml", `version: 1
+scoring:
+  category_weights: { security: 0, quality: 0, maintainability: 0, testing: 0, dependencies: 0 }
+`)
+	res := clitest.Run(t, clitest.Options{Dir: dir}, "validate")
+	if res.Code != 2 || !strings.Contains(res.Stderr, "scoring.category_weights") {
+		t.Errorf("exit code = %d, want 2 naming scoring.category_weights; stderr:\n%s", res.Code, res.Stderr)
 	}
 }

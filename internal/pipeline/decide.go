@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"fmt"
 	"maps"
 	"slices"
 
@@ -20,25 +21,18 @@ type Decision struct {
 // of its arguments, so `qgate run` and `qgate score --report` reach the
 // same decision from the same findings, config and input statuses.
 func Decide(findings []model.Finding, cfg config.Config, inputs []model.InputStatus, degraded bool) (Decision, error) {
-	params := score.Params{
-		Version:            cfg.Scoring.Version,
-		SeverityWeights:    cfg.Scoring.SeverityWeights,
-		AgentWeightPct:     cfg.Scoring.AgentWeightPct,
-		AgentMinConfidence: cfg.Scoring.AgentMinConfidence,
-		AgentMaxPenalty:    cfg.Scoring.AgentMaxPenalty,
-		CategoryWeights:    cfg.Scoring.CategoryWeights,
-	}
-	scores, err := score.Score(findings, params, Assessed(cfg.Inputs, inputs, findings))
+	params := scoreParams(cfg.Scoring)
+	scores, err := score.Score(findings, params, assessed(cfg.Inputs, inputs, findings))
 	if err != nil {
-		return Decision{}, err
+		return Decision{}, fmt.Errorf("score: %w", err)
 	}
 	result := gate.Evaluate(gate.Input{
-		Scores:             scores,
-		Findings:           findings,
-		Gate:               cfg.Profile.Gate,
-		Enforcement:        cfg.Profile.Enforcement,
-		AgentMinConfidence: cfg.Scoring.AgentMinConfidence,
-		Degraded:           degraded,
+		Scores:      scores,
+		Findings:    findings,
+		Gate:        cfg.Profile.Gate,
+		Enforcement: cfg.Profile.Enforcement,
+		Scoring:     params,
+		Degraded:    degraded,
 	})
 
 	out := model.Scores{Overall: score.Points(scores.Overall), Categories: map[string]*int{}}
@@ -48,11 +42,22 @@ func Decide(findings []model.Finding, cfg config.Config, inputs []model.InputSta
 	return Decision{Scores: out, Gate: result}, nil
 }
 
-// Assessed returns the categories some successful input covered: each
+func scoreParams(s config.Scoring) score.Params {
+	return score.Params{
+		Version:            s.Version,
+		SeverityWeights:    s.SeverityWeights,
+		AgentWeightPct:     s.AgentWeightPct,
+		AgentMinConfidence: s.AgentMinConfidence,
+		AgentMaxPenalty:    s.AgentMaxPenalty,
+		CategoryWeights:    s.CategoryWeights,
+	}
+}
+
+// assessed returns the categories some successful input covered: each
 // one's declared categories (category_default, else quality, plus
 // assesses) and the categories of the findings it produced. A failed input
 // assesses nothing, so a missing analyzer never yields a perfect score.
-func Assessed(cfgInputs []config.Input, statuses []model.InputStatus, findings []model.Finding) []model.Category {
+func assessed(cfgInputs []config.Input, statuses []model.InputStatus, findings []model.Finding) []model.Category {
 	ok := map[string]bool{}
 	for _, s := range statuses {
 		if s.Status == model.InputOK {
@@ -64,11 +69,7 @@ func Assessed(cfgInputs []config.Input, statuses []model.InputStatus, findings [
 		if !ok[in.Name] {
 			continue
 		}
-		def := in.CategoryDefault
-		if def == "" {
-			def = model.DefaultCategory
-		}
-		set[def] = true
+		set[in.EffectiveCategory()] = true
 		for _, c := range in.Assesses {
 			set[c] = true
 		}

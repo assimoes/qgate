@@ -1,6 +1,7 @@
 package gate_test
 
 import (
+	"strings"
 	"testing"
 
 	"qgate/internal/config"
@@ -54,7 +55,7 @@ func TestGateChecks(t *testing.T) {
 	}
 	res := gate.Evaluate(gate.Input{
 		Scores: scores, Findings: findings, Gate: g,
-		Enforcement: model.EnforcementBlocking, AgentMinConfidence: 70,
+		Enforcement: model.EnforcementBlocking, Scoring: score.Params{AgentMinConfidence: 70},
 	})
 	checks := checkByName(t, res)
 
@@ -170,5 +171,18 @@ func TestChecksAreListedInAStableOrder(t *testing.T) {
 		if i >= len(names) || names[i] != want[i] {
 			t.Fatalf("order = %v, want %v", names, want)
 		}
+	}
+}
+
+func TestOverallMinExplainsWeightlessCategories(t *testing.T) {
+	t.Parallel()
+	// security is assessed but carries no weight, so there is no overall.
+	res := gate.Evaluate(gate.Input{
+		Scores: score.Scores{Categories: map[model.Category]*int{"security": h(8000)}},
+		Gate:   config.Gate{OverallMin: h(50)}, Enforcement: model.EnforcementBlocking,
+	})
+	c := checkByName(t, res)["overall_min"]
+	if c.Result != model.CheckFail || !strings.Contains(c.Note, "weight") {
+		t.Errorf("overall_min = %+v, want fail with a note about category weights", c)
 	}
 }

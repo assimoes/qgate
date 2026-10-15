@@ -15,6 +15,9 @@ import (
 // Console writes the human summary to a terminal or CI log, gate outcome first.
 type Console struct {
 	W io.Writer
+	// ReproducedFrom names the saved report `qgate score` recomputed this
+	// result from; empty for a live run.
+	ReproducedFrom string
 }
 
 // Report writes the summary of r.
@@ -35,6 +38,9 @@ func (c Console) Report(_ context.Context, r *model.Report) error {
 		}
 	}
 	fmt.Fprintf(&b, "Findings: %d (%d new)\n", len(r.Findings), countNew(r.Findings))
+	if c.ReproducedFrom != "" {
+		fmt.Fprintf(&b, "Scores and gate reproduced exactly from %s\n", c.ReproducedFrom)
+	}
 	if _, err := io.WriteString(c.W, b.String()); err != nil {
 		return fmt.Errorf("write console report: %w", err)
 	}

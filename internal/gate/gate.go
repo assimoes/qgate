@@ -15,11 +15,11 @@ import (
 
 // Input is everything a gate decision depends on.
 type Input struct {
-	Scores             score.Scores // hundredths; nil means not assessed
-	Findings           []model.Finding
-	Gate               config.Gate
-	Enforcement        model.Enforcement
-	AgentMinConfidence int
+	Scores      score.Scores // hundredths; nil means not assessed
+	Findings    []model.Finding
+	Gate        config.Gate
+	Enforcement model.Enforcement
+	Scoring     score.Params
 	// Degraded says the run was incomplete: an input or agent failed, or
 	// a budget or deadline was hit.
 	Degraded bool
@@ -31,7 +31,11 @@ func Evaluate(in Input) model.GateResult {
 	var checks []model.GateCheck
 
 	if g.OverallMin != nil {
-		checks = append(checks, minScore("overall_min", in.Scores.Overall, *g.OverallMin))
+		check := minScore("overall_min", in.Scores.Overall, *g.OverallMin)
+		if in.Scores.Overall == nil && anyAssessed(in.Scores) {
+			check.Note = "assessed categories carry no weight in scoring.category_weights, so there is no overall score"
+		}
+		checks = append(checks, check)
 	}
 	required := map[model.Category]bool{}
 	for _, c := range g.RequireAssessed {
@@ -49,7 +53,7 @@ func Evaluate(in Input) model.GateResult {
 		checks = append(checks, check)
 	}
 	checks = append(checks, maxNew("max_new", g.MaxNew, in.Findings, func(f model.Finding) bool {
-		return f.Source.Kind != model.SourceAgent || (f.Confidence != nil && *f.Confidence >= in.AgentMinConfidence)
+		return score.Counted(f, in.Scoring.AgentMinConfidence)
 	})...)
 	checks = append(checks, maxNew("max_new_tool", g.MaxNewTool, in.Findings, func(f model.Finding) bool {
 		return f.Source.Kind == model.SourceTool
@@ -57,7 +61,7 @@ func Evaluate(in Input) model.GateResult {
 	for _, c := range slices.Sorted(slices.Values(g.RequireAssessed)) {
 		assessed := in.Scores.Categories[c] != nil
 		checks = append(checks, model.GateCheck{
-			Check: "require_assessed." + string(c), Expected: "assessed", Actual: assessed, Result: result(assessed),
+			Check: "require_assessed." + string(c), Expected: "assessed", Actual: assessed, Result: checkResult(assessed),
 		})
 	}
 
@@ -82,33 +86,43 @@ func minScore(name string, hundredths *int, minPoints int) model.GateCheck {
 		return c
 	}
 	c.Actual = *score.Points(hundredths)
-	c.Result = result(*hundredths >= minPoints*100)
+	c.Result = checkResult(*hundredths >= minPoints*100)
 	return c
 }
 
-// maxNew checks the count of new findings at exactly each severity.
-func maxNew(prefix string, limits map[model.Severity]int, findings []model.Finding, counts func(model.Finding) bool) []model.GateCheck {
+// maxNew checks the count of new findings at exactly each severity, among
+// those eligible counts.
+func maxNew(prefix string, limits map[model.Severity]int, findings []model.Finding, eligible func(model.Finding) bool) []model.GateCheck {
 	var out []model.GateCheck
 	for _, sev := range slices.Backward(slices.Sorted(maps.Keys(limits))) { // critical first
 		n := 0
 		for _, f := range findings {
-			if f.Status == model.StatusNew && f.Severity == sev && counts(f) {
+			if f.Status == model.StatusNew && f.Severity == sev && eligible(f) {
 				n++
 			}
 		}
 		out = append(out, model.GateCheck{
 			Check: prefix + "." + sev.String(), Expected: fmt.Sprintf("<= %d", limits[sev]),
-			Actual: n, Result: result(n <= limits[sev]),
+			Actual: n, Result: checkResult(n <= limits[sev]),
 		})
 	}
 	return out
 }
 
-func result(ok bool) model.CheckResult {
+func checkResult(ok bool) model.CheckResult {
 	if ok {
 		return model.CheckPass
 	}
 	return model.CheckFail
+}
+
+func anyAssessed(s score.Scores) bool {
+	for _, v := range s.Categories {
+		if v != nil {
+			return true
+		}
+	}
+	return false
 }
 
 // outcome applies design §13: advisory never fails; blocking fails on any

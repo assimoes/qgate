@@ -53,7 +53,7 @@ func ToolFindings(ctx context.Context, in []ingest.Finding, opts Options) ([]mod
 	kept := normalizePaths(in, opts)
 	namespaceRules(kept, opts.Input.Name)
 	warnings = append(warnings, mapSeverities(kept, opts.Input.SeverityMap)...)
-	assignCategories(kept, opts.Input.CategoryDefault)
+	assignCategories(kept, opts.Input.EffectiveCategory())
 
 	// Canonical order first, so occurrence indexes in fingerprints are
 	// deterministic.
@@ -139,11 +139,7 @@ func mapSeverities(fs []ingest.Finding, severityMap map[string]model.Severity) [
 
 // assignCategories sets each finding's category (step 4). Category
 // mappings arrive with ticket 07.
-func assignCategories(fs []ingest.Finding, categoryDefault model.Category) {
-	cat := categoryDefault
-	if cat == "" {
-		cat = model.DefaultCategory
-	}
+func assignCategories(fs []ingest.Finding, cat model.Category) {
 	for i := range fs {
 		fs[i].Category = cat
 	}

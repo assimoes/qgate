@@ -136,10 +136,14 @@ CLAUDE.md requires concurrent code to be tested for goroutines outliving their t
 
 A successful input assesses its `category_default` (or `quality`, where its findings go without one), every category in its `assesses`, and the category of every finding it produced. A failed input assesses nothing. Design §12.4 names only the declared categories; counting the categories of real findings keeps a category with new findings from being reported as not assessed.
 
-## 2026-10-16 — `score --report` compares, then decides
+## 2026-10-16 — `score --report` checks the report, then recomputes
 
-`qgate score --report` decodes the stored findings, input statuses and resolved config, recomputes scores and the gate through the same function `run` uses, and compares both sections byte for byte (after removing whitespace) with the stored ones. A mismatch is exit 3 and shows both versions. Run health is a fact of the original run, so the stored `gate.degraded` is an input to the recomputation, not an output it checks. On a match, the exit code mirrors the gate as `run` would (1 for a failed blocking gate), so CI can re-gate from an artifact.
+`qgate score --report` first checks the report against itself: `resolved_config` must hash to `config_hash`, the `scoring` section must equal `resolved_config.scoring`, and `gate.degraded` must be true if any input failed. It then recomputes scores and the gate through the same function `run` uses and compares both sections with the stored ones byte for byte in canonical JSON (sorted keys, no insignificant whitespace, numbers as written), the same encoding `config_hash` uses, so a report re-encoded by another tool still matches. Any inconsistency or mismatch is exit 3 and says what differs. A report is not signed: these checks catch edits that leave it inconsistent, not a forger who rewrites every section to agree. Run health beyond input statuses (agent failures, budgets, deadlines) is a fact of the original run, so the stored `gate.degraded` is an input to the recomputation. On a match, the exit code mirrors the gate as `run` would (1 for a failed blocking gate), so CI can re-gate from an artifact.
 
 ## 2026-10-16 — Gate check names and values
 
 Gate checks are named `overall_min`, `category_min.<category>`, `max_new.<severity>`, `max_new_tool.<severity>` and `require_assessed.<category>`, listed in that order, with categories sorted and severities from critical down. `expected` reads `>= 70`, `<= 0` or `assessed`; `actual` is the score in whole (floored) points, a count, or a boolean, and `null` for a category that was not assessed. Score comparisons use hundredths, so 69.99 fails `>= 70` and shows as 69.
+
+## 2026-10-16 — Category weights
+
+At least one `scoring.category_weights` entry must be positive (exit 2 otherwise). A category with weight 0 is still scored and shown but does not contribute to the overall score; when every assessed category weighs 0 there is no overall score, and the `overall_min` gate check says so in its note rather than implying nothing was assessed. The weighting that forms the overall score belongs to the scoring algorithm version, like the category scores.

@@ -95,7 +95,7 @@ func (a app) runPipeline(ctx context.Context, started time.Time, res *config.Res
 	hash := sha256.Sum256(resolved)
 	decision, err := pipeline.Decide(inputs.Findings, cfg, inputs.Statuses, pipeline.Degraded(inputs.Statuses))
 	if err != nil {
-		return err
+		return fmt.Errorf("decide: %w", err)
 	}
 	scoringParams, err := json.Marshal(res.Document["scoring"])
 	if err != nil {

@@ -1,7 +1,11 @@
 package score_test
 
 import (
+	"encoding/json"
+	"flag"
 	"math/rand/v2"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 
@@ -47,7 +51,11 @@ func hundredths(t *testing.T, p *int) int {
 	return *p
 }
 
-// TestWorkedExample is the golden example of design §12.3.
+var update = flag.Bool("update", false, "rewrite golden files")
+
+// TestWorkedExample is the golden example of design §12.3: one new high
+// tool finding and one new medium agent finding at confidence 85 in
+// security score 7600 hundredths, reported as 76.
 func TestWorkedExample(t *testing.T) {
 	t.Parallel()
 	findings := []model.Finding{
@@ -58,14 +66,26 @@ func TestWorkedExample(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := hundredths(t, s.Categories["security"]); got != 7600 {
-		t.Errorf("security = %d hundredths, want 7600", got)
+	got, err := json.MarshalIndent(struct {
+		Hundredths score.Scores `json:"hundredths"`
+		Reported   *int         `json:"reported_security"`
+	}{s, score.Points(s.Categories["security"])}, "", "  ")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if got := score.Points(s.Categories["security"]); got == nil || *got != 76 {
-		t.Errorf("reported security = %v, want 76", got)
+	got = append(got, '\n')
+	golden := filepath.Join("testdata", "worked_example.golden.json")
+	if *update {
+		if err := os.WriteFile(golden, got, 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if got := hundredths(t, s.Overall); got != 7600 {
-		t.Errorf("overall = %d, want 7600 (security is the only assessed category)", got)
+	want, err := os.ReadFile(golden)
+	if err != nil {
+		t.Fatalf("read golden (run with -update to create it): %v", err)
+	}
+	if string(got) != string(want) {
+		t.Errorf("worked example differs from %s:\n%s", golden, got)
 	}
 }
 

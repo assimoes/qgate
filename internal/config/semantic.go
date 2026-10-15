@@ -41,6 +41,7 @@ func checkDuplicates(layer map[string]any, file string) Errors {
 func checkSemantics(doc map[string]any, blame blame) Errors {
 	c := checker{doc: doc, blame: blame}
 	c.categories()
+	c.categoryWeights()
 	c.providerRefs()
 	c.agentRefs()
 	c.agentKinds()
@@ -149,6 +150,21 @@ func (c *checker) categories() {
 			check(prof.p.key("gate").key("require_assessed").index(j), cat)
 		}
 	}
+}
+
+// categoryWeights rejects weights that are all zero: the overall score
+// would never exist, however much was assessed.
+func (c *checker) categoryWeights() {
+	weights := c.mapAt("scoring", "category_weights")
+	if len(weights) == 0 {
+		return
+	}
+	for _, w := range weights {
+		if n, ok := w.(int64); ok && n > 0 {
+			return
+		}
+	}
+	c.fail(path{"scoring", "category_weights"}, "at least one category weight must be positive")
 }
 
 func (c *checker) providerRefs() {

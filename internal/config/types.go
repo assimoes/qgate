@@ -143,6 +143,16 @@ type Input struct {
 	Options         map[string]any            `json:"options"`
 }
 
+// EffectiveCategory is where the input's findings go and what it assesses
+// when no category mapping applies: its category_default, else the default
+// category.
+func (in Input) EffectiveCategory() model.Category {
+	if in.CategoryDefault != "" {
+		return in.CategoryDefault
+	}
+	return model.DefaultCategory
+}
+
 // JSONMapping maps arbitrary JSON to findings with JSONPath expressions.
 type JSONMapping struct {
 	Items     string `json:"items"`

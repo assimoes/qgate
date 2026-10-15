@@ -34,8 +34,9 @@ type Scores struct {
 	Categories map[model.Category]*int // every assessed category, plus not-assessed ones scored nil
 }
 
-// algorithm computes category scores for the assessed categories.
-type algorithm func(findings []model.Finding, p Params, assessed []model.Category) map[model.Category]int
+// algorithm is one frozen scoring version: category and overall scores for
+// the assessed categories.
+type algorithm func(findings []model.Finding, p Params, assessed []model.Category) Scores
 
 // algorithms are the released scoring versions.
 var algorithms = map[int]algorithm{
@@ -51,15 +52,42 @@ func Score(findings []model.Finding, p Params, assessed []model.Category) (Score
 		return Scores{}, fmt.Errorf("scoring version %d is not supported (this build supports %v)",
 			p.Version, slices.Sorted(maps.Keys(algorithms)))
 	}
-	categories := algo(findings, p, assessed)
+	return algo(findings, p, assessed), nil
+}
+
+// Counted reports whether a new finding counts against scores and gate
+// checks: every tool finding, and agent findings at or above the minimum
+// confidence. Released algorithms depend on it, so changing it changes them.
+func Counted(f model.Finding, agentMinConfidence int) bool {
+	if f.Source.Kind != model.SourceAgent {
+		return true
+	}
+	return f.Confidence != nil && *f.Confidence >= agentMinConfidence
+}
+
+// scoreV1 is design §12.2. Frozen: a change is a new version.
+func scoreV1(findings []model.Finding, p Params, assessed []model.Category) Scores {
+	toolPenalty := map[model.Category]int{}
+	agentPenalty := map[model.Category]int{}
+	for _, f := range findings {
+		if f.Status != model.StatusNew || !Counted(f, p.AgentMinConfidence) {
+			continue
+		}
+		w := p.SeverityWeights[f.Severity]
+		if f.Source.Kind == model.SourceAgent {
+			agentPenalty[f.Category] += w * p.AgentWeightPct
+		} else {
+			toolPenalty[f.Category] += w * 100
+		}
+	}
 
 	s := Scores{Categories: map[model.Category]*int{}}
 	for c := range p.CategoryWeights {
-		s.Categories[c] = nil
+		s.Categories[c] = nil // not assessed unless set below
 	}
 	weighted, weights := 0, 0
-	for _, c := range slices.Sorted(maps.Keys(categories)) {
-		v := categories[c]
+	for _, c := range slices.Sorted(slices.Values(assessed)) {
+		v := max(0, full-toolPenalty[c]-min(p.AgentMaxPenalty*100, agentPenalty[c]))
 		s.Categories[c] = &v
 		weighted += p.CategoryWeights[c] * v
 		weights += p.CategoryWeights[c]
@@ -68,33 +96,7 @@ func Score(findings []model.Finding, p Params, assessed []model.Category) (Score
 		overall := weighted / weights
 		s.Overall = &overall
 	}
-	return s, nil
-}
-
-// scoreV1 is design §12.2. Frozen.
-func scoreV1(findings []model.Finding, p Params, assessed []model.Category) map[model.Category]int {
-	toolPenalty := map[model.Category]int{}
-	agentPenalty := map[model.Category]int{}
-	for _, f := range findings {
-		if f.Status != model.StatusNew {
-			continue
-		}
-		w := p.SeverityWeights[f.Severity]
-		switch f.Source.Kind {
-		case model.SourceAgent:
-			if f.Confidence != nil && *f.Confidence >= p.AgentMinConfidence {
-				agentPenalty[f.Category] += w * p.AgentWeightPct
-			}
-		default:
-			toolPenalty[f.Category] += w * 100
-		}
-	}
-	out := make(map[model.Category]int, len(assessed))
-	for _, c := range assessed {
-		agent := min(p.AgentMaxPenalty*100, agentPenalty[c])
-		out[c] = max(0, full-toolPenalty[c]-agent)
-	}
-	return out
+	return s
 }
 
 // Points converts hundredths to the whole points reports show, flooring
