@@ -1,0 +1,3 @@
+# LLMs produce findings, never scores
+
+Agents only ever emit findings and annotations; category and overall scores come from a pure, versioned, integer-arithmetic function over new findings, with agent influence capped per category (`agent_weight_pct`, `agent_min_confidence`, `agent_max_penalty`). We chose this over letting a model grade the change directly because gate outcomes must be reproducible from a saved report without calling any LLM, must not drift with model or prompt changes, and must not be steerable by prompt injection in the code under review: a manipulated agent can cost a bounded number of points but can never make a failing change pass.
