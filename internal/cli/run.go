@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"time"
@@ -14,7 +15,9 @@ import (
 
 	"qgate/internal/buildinfo"
 	"qgate/internal/config"
+	"qgate/internal/gitctx"
 	"qgate/internal/model"
+	"qgate/internal/pipeline"
 	"qgate/internal/report"
 )
 
@@ -22,8 +25,14 @@ import (
 // output is configured, relative to the working directory.
 const DefaultReportPath = "qgate-report.json"
 
+// runFlags select what `qgate run` reviews.
+type runFlags struct {
+	base, head string
+}
+
 func (a app) newRunCommand() *cobra.Command {
 	var flags configFlags
+	var rf runFlags
 	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "Run the full quality gate pipeline",
@@ -34,16 +43,44 @@ func (a app) newRunCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return a.runPipeline(cmd.Context(), started, res)
+			return a.runPipeline(cmd.Context(), started, res, rf)
 		},
 	}
 	flags.register(cmd)
+	cmd.Flags().StringVar(&rf.base, "base", "", "base commit or ref (default: merge base with origin's default branch)")
+	cmd.Flags().StringVar(&rf.head, "head", "", "head commit or ref (default: HEAD)")
 	return cmd
 }
 
-func (a app) runPipeline(ctx context.Context, started time.Time, res *config.Resolved) error {
+func (a app) runPipeline(ctx context.Context, started time.Time, res *config.Resolved, rf runFlags) error {
 	if res.RepoConfig == "" {
 		a.logger.Warn("no repo config found; only builtin policy is active")
+	}
+	cfg := res.Config
+
+	// Git context is needed only when something produces findings.
+	var gc *gitctx.Context
+	inputs := pipeline.InputsResult{Findings: []model.Finding{}, Statuses: []model.InputStatus{}}
+	if len(cfg.Inputs) > 0 {
+		var err error
+		gc, err = gitctx.Resolve(ctx, gitctx.Options{
+			Dir: a.inv.Dir, Base: rf.base, Head: rf.head, Env: a.inv.Env,
+			Include: cfg.Project.Include, Exclude: cfg.Project.Exclude,
+		})
+		if errors.Is(err, gitctx.ErrNotARepository) || errors.Is(err, gitctx.ErrNoBase) {
+			return usageError{err}
+		}
+		if err != nil {
+			return err
+		}
+		inputs, err = pipeline.RunInputs(ctx, pipeline.InputDeps{
+			Registry:   a.ingestors,
+			Dir:        a.inv.Dir,
+			Workspaces: a.workspaces(gc),
+		}, cfg, gc)
+		if err != nil {
+			return err
+		}
 	}
 
 	runID, err := newRunID()
@@ -56,7 +93,6 @@ func (a app) runPipeline(ctx context.Context, started time.Time, res *config.Res
 		return fmt.Errorf("encode resolved config: %w", err)
 	}
 	hash := sha256.Sum256(resolved)
-	cfg := res.Config
 	scoringParams, err := json.Marshal(res.Document["scoring"])
 	if err != nil {
 		return fmt.Errorf("encode scoring params: %w", err)
@@ -75,13 +111,16 @@ func (a app) runPipeline(ctx context.Context, started time.Time, res *config.Res
 		ConfigHash:     hex.EncodeToString(hash[:]),
 		ResolvedConfig: resolved,
 		Scoring:        model.Scoring{Version: cfg.Scoring.Version, Params: scoringParams},
-		Inputs:         []model.InputStatus{},
+		Inputs:         inputs.Statuses,
 		Agents:         []model.AgentStatus{},
-		Findings:       []model.Finding{},
-		Metrics:        []model.Metric{},
+		Findings:       inputs.Findings,
+		Metrics:        nonNil(inputs.Metrics),
 		Scores:         model.Scores{Categories: map[string]*int{}},
 		Gate:           model.GateResult{Outcome: model.OutcomePass, Checks: []model.GateCheck{}},
 		DataEgress:     []model.Egress{},
+	}
+	if gc != nil {
+		r.Run.BaseSHA, r.Run.HeadSHA = gc.BaseSHA, gc.HeadSHA
 	}
 	r.Run.DurationMS = time.Since(started).Milliseconds()
 
@@ -94,6 +133,25 @@ func (a app) runPipeline(ctx context.Context, started time.Time, res *config.Res
 		a.logger.Warn("console reporter failed", "error", err)
 	}
 	return nil
+}
+
+// workspaces are absolute prefixes analyzers may have written into paths:
+// the repo root and the CI workspace.
+func (a app) workspaces(gc *gitctx.Context) []string {
+	ws := []string{gc.RepoRoot}
+	for _, k := range []string{"GITHUB_WORKSPACE", "CI_PROJECT_DIR"} {
+		if v := a.inv.Env[k]; v != "" {
+			ws = append(ws, v)
+		}
+	}
+	return ws
+}
+
+func nonNil[T any](s []T) []T {
+	if s == nil {
+		return []T{}
+	}
+	return s
 }
 
 // newRunID returns a random RFC 4122 version 4 UUID.

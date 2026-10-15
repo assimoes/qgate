@@ -1,0 +1,69 @@
+{
+  "version": "2.1.0",
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "fullName": "Trivy Vulnerability Scanner",
+          "informationUri": "https://github.com/aquasecurity/trivy",
+          "name": "Trivy",
+          "rules": [
+            {
+              "id": "CVE-2023-45288",
+              "name": "LanguageSpecificPackageVulnerability",
+              "shortDescription": { "text": "golang: net/http, x/net/http2: unlimited number of CONTINUATION frames causes DoS" },
+              "fullDescription": { "text": "An attacker may cause an HTTP/2 endpoint to read arbitrary amounts of header data." },
+              "defaultConfiguration": { "level": "warning" },
+              "helpUri": "https://avd.aquasec.com/nvd/cve-2023-45288",
+              "properties": { "precision": "very-high", "security-severity": "7.5", "tags": ["vulnerability", "security", "HIGH"] }
+            },
+            {
+              "id": "CVE-2024-24790",
+              "name": "LanguageSpecificPackageVulnerability",
+              "shortDescription": { "text": "golang: net/netip: Unexpected behavior from Is methods for IPv4-mapped IPv6 addresses" },
+              "defaultConfiguration": { "level": "error" },
+              "helpUri": "https://avd.aquasec.com/nvd/cve-2024-24790",
+              "properties": { "precision": "very-high", "security-severity": "9.8", "tags": ["vulnerability", "security", "CRITICAL"] }
+            }
+          ],
+          "version": "0.56.2"
+        }
+      },
+      "results": [
+        {
+          "ruleId": "CVE-2023-45288",
+          "ruleIndex": 0,
+          "level": "error",
+          "message": { "text": "Package: golang.org/x/net\nInstalled Version: v0.20.0\nVulnerability CVE-2023-45288\nSeverity: HIGH\nFixed Version: 0.23.0" },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "go.mod", "uriBaseId": "ROOTPATH" },
+                "region": { "startLine": 12, "startColumn": 1, "endLine": 12, "endColumn": 1 }
+              },
+              "message": { "text": "go.mod: golang.org/x/net@v0.20.0" }
+            }
+          ]
+        },
+        {
+          "ruleId": "CVE-2024-24790",
+          "ruleIndex": 1,
+          "level": "error",
+          "message": { "text": "Package: stdlib\nInstalled Version: v1.22.1\nVulnerability CVE-2024-24790\nSeverity: CRITICAL\nFixed Version: 1.21.11, 1.22.4" },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "bin/server", "uriBaseId": "ROOTPATH" },
+                "region": { "startLine": 1, "startColumn": 1, "endLine": 1, "endColumn": 1 }
+              },
+              "message": { "text": "bin/server: stdlib@v1.22.1" }
+            }
+          ]
+        }
+      ],
+      "columnKind": "utf16CodeUnits",
+      "originalUriBaseIds": { "ROOTPATH": { "uri": "file:///" } }
+    }
+  ]
+}

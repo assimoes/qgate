@@ -12,6 +12,9 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+
+	"qgate/internal/ingest"
+	"qgate/internal/ingest/sarif"
 )
 
 // Invocation is everything a qgate process receives from its environment.
@@ -32,8 +35,14 @@ const defaultHTTPTimeout = 30 * time.Second
 
 // app carries what every command needs.
 type app struct {
-	inv    Invocation
-	logger *slog.Logger
+	inv       Invocation
+	logger    *slog.Logger
+	ingestors *ingest.Registry
+}
+
+// builtinIngestors are the analyzer report formats this build reads.
+func builtinIngestors() *ingest.Registry {
+	return ingest.NewRegistry(sarif.New())
 }
 
 // Execute runs qgate with inv and returns the process exit code.
@@ -41,7 +50,7 @@ func Execute(ctx context.Context, inv Invocation) int {
 	if inv.HTTP == nil {
 		inv.HTTP = &http.Client{Timeout: defaultHTTPTimeout}
 	}
-	a := app{inv: inv, logger: slog.New(slog.NewTextHandler(inv.Stderr, nil))}
+	a := app{inv: inv, logger: slog.New(slog.NewTextHandler(inv.Stderr, nil)), ingestors: builtinIngestors()}
 	root := a.newRootCommand()
 	root.SetArgs(inv.Args)
 	root.SetOut(inv.Stdout)

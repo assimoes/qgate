@@ -1,0 +1,52 @@
+{
+  "findings": [
+    {
+      "fingerprint": "",
+      "rule_id": "CVE-2023-45288",
+      "category": "",
+      "severity": "info",
+      "title": "golang: net/http, x/net/http2: unlimited number of CONTINUATION frames causes DoS",
+      "message": "Package: golang.org/x/net\nInstalled Version: v0.20.0\nVulnerability CVE-2023-45288\nSeverity: HIGH\nFixed Version: 0.23.0",
+      "location": {
+        "path": "go.mod",
+        "start_line": 12,
+        "end_line": 12,
+        "start_col": 1,
+        "end_col": 1
+      },
+      "source": {
+        "kind": "tool",
+        "name": "",
+        "version": "0.56.2"
+      },
+      "status": "",
+      "raw_severity": "error",
+      "default_severity": "high"
+    },
+    {
+      "fingerprint": "",
+      "rule_id": "CVE-2024-24790",
+      "category": "",
+      "severity": "info",
+      "title": "golang: net/netip: Unexpected behavior from Is methods for IPv4-mapped IPv6 addresses",
+      "message": "Package: stdlib\nInstalled Version: v1.22.1\nVulnerability CVE-2024-24790\nSeverity: CRITICAL\nFixed Version: 1.21.11, 1.22.4",
+      "location": {
+        "path": "bin/server",
+        "start_line": 1,
+        "end_line": 1,
+        "start_col": 1,
+        "end_col": 1
+      },
+      "source": {
+        "kind": "tool",
+        "name": "",
+        "version": "0.56.2"
+      },
+      "status": "",
+      "raw_severity": "error",
+      "default_severity": "critical"
+    }
+  ],
+  "metrics": null,
+  "warnings": null
+}

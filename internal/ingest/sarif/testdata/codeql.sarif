@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "CodeQL",
+          "organization": "GitHub",
+          "semanticVersion": "2.19.3",
+          "notifications": [],
+          "rules": []
+        },
+        "extensions": [
+          {
+            "name": "codeql/go-queries",
+            "semanticVersion": "1.1.2+de325133c7a95d84489acdf5a6ced07886ac5c6d",
+            "rules": [
+              {
+                "id": "go/log-injection",
+                "name": "go/log-injection",
+                "shortDescription": { "text": "Log entries created from user input" },
+                "defaultConfiguration": { "enabled": true, "level": "error" },
+                "properties": { "tags": ["security", "external/cwe/cwe-117"], "precision": "medium", "security-severity": "7.8" }
+              },
+              {
+                "id": "go/sql-injection",
+                "name": "go/sql-injection",
+                "shortDescription": { "text": "Database query built from user-controlled sources" },
+                "defaultConfiguration": { "enabled": true, "level": "error" },
+                "properties": { "tags": ["security", "external/cwe/cwe-089"], "precision": "high", "security-severity": "8.8" }
+              }
+            ]
+          }
+        ]
+      },
+      "artifacts": [{ "location": { "uri": "internal/pay/charge.go", "uriBaseId": "%SRCROOT%", "index": 0 } }],
+      "results": [
+        {
+          "ruleId": "go/sql-injection",
+          "ruleIndex": 1,
+          "rule": { "id": "go/sql-injection", "index": 1, "toolComponent": { "index": 0 } },
+          "message": { "text": "This query depends on a [user-provided value](1)." },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "internal/pay/charge.go", "uriBaseId": "%SRCROOT%", "index": 0 },
+                "region": { "startLine": 52, "startColumn": 24, "endColumn": 61 }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "c7a95d84489acdf5:1",
+            "primaryLocationStartColumnFingerprint": "19"
+          }
+        }
+      ],
+      "columnKind": "unicodeCodePoints",
+      "properties": { "semmle.formatSpecifier": "sarifv2.1.0" }
+    }
+  ]
+}

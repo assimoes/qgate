@@ -1,0 +1,33 @@
+{
+  "findings": [
+    {
+      "fingerprint": "",
+      "rule_id": "go/sql-injection",
+      "category": "",
+      "severity": "info",
+      "title": "Database query built from user-controlled sources",
+      "message": "This query depends on a [user-provided value](1).",
+      "location": {
+        "path": "internal/pay/charge.go",
+        "start_line": 52,
+        "end_line": 52,
+        "start_col": 24,
+        "end_col": 61
+      },
+      "cwe": [
+        "CWE-89"
+      ],
+      "source": {
+        "kind": "tool",
+        "name": "",
+        "version": "2.19.3"
+      },
+      "status": "",
+      "raw_severity": "error",
+      "default_severity": "high",
+      "tool_fingerprint": "primaryLocationLineHash=c7a95d84489acdf5:1;primaryLocationStartColumnFingerprint=19"
+    }
+  ],
+  "metrics": null,
+  "warnings": null
+}

@@ -97,3 +97,23 @@ An org config URL may carry credentials in its user info or query string. Everyw
 ## 2026-10-16 — The HTTP client is chosen at the composition root
 
 `config` depends on a one-method `HTTPDoer` interface. The CLI supplies an `*http.Client` with a 30-second timeout unless the invocation provides its own (tests inject a TLS test server's client).
+
+## 2026-10-16 — Ingestors return raw severities, not final ones
+
+Design §9 step 3 applies an input's `severity_map` before the format's builtin mapping, so the ingestor cannot settle severity itself. `ingest.Finding` carries the analyzer's label (`raw_severity`), the format's builtin mapping for that finding (`default_severity`, e.g. SARIF `security-severity` when present, else its `level`) and the analyzer's own fingerprint. Design §8.2 is updated to match.
+
+## 2026-10-16 — SARIF goldens use fixtures in each analyzer's shape
+
+Semgrep, CodeQL and Trivy are not installed where ticket 05 was built, so the Seam C fixtures are written by hand in each tool's real SARIF shape (Semgrep's matchBasedId fingerprints and CWE-prefixed tags, CodeQL's rules in query-pack `extensions` referenced through `rule.toolComponent.index`, Trivy's ROOTPATH base and severity tags). Replace them with captured output, and regenerate the goldens with `-update`, the first time the analyzers run in CI.
+
+## 2026-10-16 — Git context only when inputs exist
+
+`qgate run` resolves base, head and the diff only when the config has inputs, so a run with nothing to analyze still works outside a git repository. With inputs, running outside a repository, or with no `--base` and no `origin/HEAD` to take a merge base with, is a usage error (exit 2) that names `--base`. Git runs with only `HOME`, `PATH` and the git-config isolation variables from the environment, non-interactive and with a stable locale.
+
+## 2026-10-16 — What the diff counts as changed
+
+A pure rename (100% similarity) is a changed file with no added lines: under `diff` its findings are out of scope, under `files` they are new. A deleted file's findings are never new. A binary file is changed but has no line ranges, so only its file-level findings are new under `diff`. SARIF results without a file location are skipped with a warning in the input's status.
+
+## 2026-10-16 — Inputs run four at a time; a missing file fails only that input
+
+Inputs are read and normalized in parallel, at most four at once, each into its own result slot, then reported in config order. A missing import file, an unsupported format or mode, or a parse error marks that input `failed` with the reason and the run continues; what a failed input does to the outcome and exit code (required inputs, `on_input_error`) arrives with ticket 09. Category mappings arrive with ticket 07; until then a finding's category is the input's `category_default`, else `quality`.

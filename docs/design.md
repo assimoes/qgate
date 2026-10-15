@@ -346,9 +346,19 @@ All commands run in the repo root with a timeout and a minimal environment plus 
 ```go
 type Ingestor interface {
 	Format() string
-	Parse(ctx context.Context, r io.Reader, in InputConfig, gc *gitctx.Context) (IngestResult, error)
+	Parse(ctx context.Context, r io.Reader, in config.Input, gc *gitctx.Context) (ingest.Result, error)
 }
-type IngestResult struct { Findings []model.Finding; Metrics []model.Metric; Warnings []string }
+type Result struct { Findings []ingest.Finding; Metrics []model.Metric; Warnings []string }
+
+// ingest.Finding is a model.Finding before normalization, plus what
+// normalization needs from the format: the analyzer's raw severity label,
+// the format's builtin severity for it, and the analyzer's own fingerprint.
+type Finding struct {
+	model.Finding
+	RawSeverity     string
+	DefaultSeverity *model.Severity
+	ToolFingerprint string
+}
 ```
 
 Ingestors register by format name; adding one touches only its package and the registry.

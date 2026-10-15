@@ -1,0 +1,60 @@
+{
+  "findings": [
+    {
+      "fingerprint": "",
+      "rule_id": "python.lang.security.audit.formatted-sql-query.formatted-sql-query",
+      "category": "",
+      "severity": "info",
+      "title": "Semgrep Finding: python.lang.security.audit.formatted-sql-query.formatted-sql-query",
+      "message": "Detected string formatting used to build a SQL query. Use parameterized queries instead.",
+      "location": {
+        "path": "app/db.py",
+        "start_line": 14,
+        "end_line": 14,
+        "start_col": 5,
+        "end_col": 62
+      },
+      "cwe": [
+        "CWE-89"
+      ],
+      "source": {
+        "kind": "tool",
+        "name": "",
+        "version": "1.95.0"
+      },
+      "status": "",
+      "raw_severity": "error",
+      "default_severity": "high",
+      "tool_fingerprint": "matchBasedId/v1=3f1e0c9a7b2d6e54a8c1f0e9d7b6a5c4e3d2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6"
+    },
+    {
+      "fingerprint": "",
+      "rule_id": "python.flask.security.audit.debug-enabled.debug-enabled",
+      "category": "",
+      "severity": "info",
+      "title": "Semgrep Finding: python.flask.security.audit.debug-enabled.debug-enabled",
+      "message": "Debug mode is enabled in a Flask app.",
+      "location": {
+        "path": "app/views.py",
+        "start_line": 40,
+        "end_line": 41,
+        "start_col": 9,
+        "end_col": 30
+      },
+      "cwe": [
+        "CWE-489"
+      ],
+      "source": {
+        "kind": "tool",
+        "name": "",
+        "version": "1.95.0"
+      },
+      "status": "",
+      "raw_severity": "warning",
+      "default_severity": "medium",
+      "tool_fingerprint": "matchBasedId/v1=9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6d"
+    }
+  ],
+  "metrics": null,
+  "warnings": null
+}
