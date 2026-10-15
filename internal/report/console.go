@@ -18,7 +18,7 @@ type Console struct {
 func (c Console) Report(_ context.Context, r *model.Report) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Gate outcome: %s\n", strings.ToUpper(string(r.Gate.Outcome)))
-	fmt.Fprintf(&b, "Stage: %s (%s, gating scope %s)\n", r.Run.Stage, r.Run.Enforcement, r.Run.Scope)
+	fmt.Fprintf(&b, "Stage: %s (%s, gating scope %s)\n", r.Run.Stage, r.Run.Enforcement, r.Run.GatingScope)
 	if r.Scores.Overall == nil {
 		b.WriteString("Overall score: not assessed\n")
 	} else {

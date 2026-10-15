@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
@@ -22,10 +21,11 @@ import (
 	"qgate/internal/score"
 )
 
-const (
-	defaultStage      = "dev"
-	defaultReportPath = "qgate-report.json"
-)
+// DefaultReportPath is where `qgate run` writes the JSON report when no
+// output is configured, relative to the working directory.
+const DefaultReportPath = "qgate-report.json"
+
+const defaultStage = "dev"
 
 // repoConfigNames are the repo config files looked up in the repo root, in order.
 var repoConfigNames = []string{".qgate.yaml", ".qgate.yml"}
@@ -34,7 +34,7 @@ type runOptions struct {
 	stage string
 }
 
-func newRunCommand(inv Invocation, logger *slog.Logger) *cobra.Command {
+func (a app) newRunCommand() *cobra.Command {
 	var opts runOptions
 	cmd := &cobra.Command{
 		Use:   "run",
@@ -42,24 +42,24 @@ func newRunCommand(inv Invocation, logger *slog.Logger) *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if !cmd.Flags().Changed("stage") {
-				opts.stage = envOr(inv.Env, "QGATE_STAGE", defaultStage)
+				opts.stage = envOr(a.inv.Env, "QGATE_STAGE", defaultStage)
 			}
-			return runPipeline(cmd.Context(), inv, logger, opts)
+			return a.runPipeline(cmd.Context(), opts)
 		},
 	}
-	cmd.Flags().StringVar(&opts.stage, "stage", defaultStage, "profile name to apply (env QGATE_STAGE)")
+	cmd.Flags().StringVar(&opts.stage, "stage", defaultStage, "stage to run; selects the profile of the same name (env QGATE_STAGE)")
 	return cmd
 }
 
-func runPipeline(ctx context.Context, inv Invocation, logger *slog.Logger, opts runOptions) error {
+func (a app) runPipeline(ctx context.Context, opts runOptions) error {
 	started := time.Now()
 
-	found, err := repoConfigExists(inv)
+	found, err := a.repoConfigExists()
 	if err != nil {
 		return err
 	}
 	if !found {
-		logger.Warn("no repo config found; only builtin policy is active")
+		a.logger.Warn("no repo config found; only builtin policy is active")
 	}
 
 	runID, err := newRunID()
@@ -77,7 +77,7 @@ func runPipeline(ctx context.Context, inv Invocation, logger *slog.Logger, opts 
 			StartedAt:   started.UTC(),
 			Stage:       opts.stage,
 			Enforcement: model.EnforcementAdvisory,
-			Scope:       model.ScopeDiff,
+			GatingScope: model.GatingScopeDiff,
 		},
 		ConfigHash:     hex.EncodeToString(hash[:]),
 		ResolvedConfig: resolved,
@@ -93,22 +93,30 @@ func runPipeline(ctx context.Context, inv Invocation, logger *slog.Logger, opts 
 	r.Run.DurationMS = time.Since(started).Milliseconds()
 
 	// The JSON report is the canonical record: failing to write it is fatal.
-	if err := (report.JSON{Path: filepath.Join(inv.Dir, defaultReportPath)}).Report(ctx, r); err != nil {
+	if err := (report.JSON{Path: filepath.Join(a.inv.Dir, DefaultReportPath)}).Report(ctx, r); err != nil {
 		return err
 	}
 	// Any other reporter failing never changes the outcome.
-	if err := (report.Console{W: inv.Stdout}).Report(ctx, r); err != nil {
-		logger.Warn("console reporter failed", "error", err)
+	if err := (report.Console{W: a.inv.Stdout}).Report(ctx, r); err != nil {
+		a.logger.Warn("console reporter failed", "error", err)
 	}
 	return nil
 }
 
-func repoConfigExists(inv Invocation) (bool, error) {
-	if p := inv.Env["QGATE_CONFIG"]; p != "" {
+// repoConfigExists reports whether a repo config is present. An explicitly
+// named config (QGATE_CONFIG) that does not exist is a config error.
+func (a app) repoConfigExists() (bool, error) {
+	if p := a.inv.Env["QGATE_CONFIG"]; p != "" {
+		if !filepath.IsAbs(p) {
+			p = filepath.Join(a.inv.Dir, p)
+		}
+		if _, err := os.Stat(p); err != nil {
+			return false, usageErrorf("repo config %s: %w", p, err)
+		}
 		return true, nil
 	}
 	for _, name := range repoConfigNames {
-		_, err := os.Stat(filepath.Join(inv.Dir, name))
+		_, err := os.Stat(filepath.Join(a.inv.Dir, name))
 		switch {
 		case err == nil:
 			return true, nil

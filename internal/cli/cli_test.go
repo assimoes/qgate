@@ -32,6 +32,7 @@ func TestUsageErrorsExitTwo(t *testing.T) {
 		{"unknown flag on run", []string{"run", "--nope"}},
 		{"unexpected argument", []string{"version", "extra"}},
 		{"no command", nil},
+		{"help for unknown command", []string{"help", "frobnicate"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -44,5 +45,17 @@ func TestUsageErrorsExitTwo(t *testing.T) {
 				t.Error("stderr is empty, want an explanation")
 			}
 		})
+	}
+}
+
+func TestHelpForKnownCommandSucceeds(t *testing.T) {
+	t.Parallel()
+	res := clitest.Run(t, clitest.Options{}, "help", "run")
+
+	if res.Code != 0 {
+		t.Fatalf("exit code = %d, want 0; stderr:\n%s", res.Code, res.Stderr)
+	}
+	if !strings.Contains(res.Stdout, "qgate run") {
+		t.Errorf("stdout is not help for run:\n%s", res.Stdout)
 	}
 }

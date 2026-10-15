@@ -21,8 +21,11 @@ const (
 
 var severityNames = [...]string{"info", "low", "medium", "high", "critical"}
 
+func (s Severity) valid() bool { return s >= SeverityInfo && s <= SeverityCritical }
+
+// String returns the lowercase severity name.
 func (s Severity) String() string {
-	if s < SeverityInfo || s > SeverityCritical {
+	if !s.valid() {
 		return fmt.Sprintf("Severity(%d)", int(s))
 	}
 	return severityNames[s]
@@ -40,7 +43,7 @@ func ParseSeverity(name string) (Severity, error) {
 
 // MarshalJSON encodes the severity as its lowercase name.
 func (s Severity) MarshalJSON() ([]byte, error) {
-	if s < SeverityInfo || s > SeverityCritical {
+	if !s.valid() {
 		return nil, fmt.Errorf("marshal severity: invalid value %d", int(s))
 	}
 	return json.Marshal(s.String())

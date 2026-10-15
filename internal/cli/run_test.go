@@ -43,22 +43,40 @@ func TestRunWithNoInputsWritesValidReportAndPasses(t *testing.T) {
 
 func TestRunRecordsTheSelectedStage(t *testing.T) {
 	t.Parallel()
-	res := clitest.Run(t, clitest.Options{}, "run", "--stage", "staging")
-
-	if res.Code != 0 {
-		t.Fatalf("exit code = %d, want 0; stderr:\n%s", res.Code, res.Stderr)
+	tests := []struct {
+		name string
+		env  map[string]string
+		args []string
+		want string
+	}{
+		{"default", nil, nil, "dev"},
+		{"flag", nil, []string{"--stage", "staging"}, "staging"},
+		{"environment", map[string]string{"QGATE_STAGE": "prod"}, nil, "prod"},
+		{"flag beats environment", map[string]string{"QGATE_STAGE": "prod"}, []string{"--stage", "staging"}, "staging"},
 	}
-	if got := res.DecodeReport(t)["run"].(map[string]any)["stage"]; got != "staging" {
-		t.Errorf("run.stage = %v, want staging", got)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			res := clitest.Run(t, clitest.Options{Env: tt.env}, append([]string{"run"}, tt.args...)...)
+			if res.Code != 0 {
+				t.Fatalf("exit code = %d, want 0; stderr:\n%s", res.Code, res.Stderr)
+			}
+			if got := res.DecodeReport(t)["run"].(map[string]any)["stage"]; got != tt.want {
+				t.Errorf("run.stage = %v, want %s", got, tt.want)
+			}
+		})
 	}
 }
 
-func TestRunStageFallsBackToEnvironment(t *testing.T) {
+func TestRunWithMissingExplicitConfigIsAConfigError(t *testing.T) {
 	t.Parallel()
-	res := clitest.Run(t, clitest.Options{Env: map[string]string{"QGATE_STAGE": "prod"}}, "run")
+	res := clitest.Run(t, clitest.Options{Env: map[string]string{"QGATE_CONFIG": "does-not-exist.yaml"}}, "run")
 
-	if got := res.DecodeReport(t)["run"].(map[string]any)["stage"]; got != "prod" {
-		t.Errorf("run.stage = %v, want prod from QGATE_STAGE", got)
+	if res.Code != 2 {
+		t.Fatalf("exit code = %d, want 2; stderr:\n%s", res.Code, res.Stderr)
+	}
+	if !strings.Contains(res.Stderr, "does-not-exist.yaml") {
+		t.Errorf("stderr does not name the missing config:\n%s", res.Stderr)
 	}
 }
 
@@ -108,5 +126,22 @@ func TestRunDoesNotWarnWhenRepoConfigExists(t *testing.T) {
 				t.Errorf("unexpected builtin-policy warning with %s present:\n%s", name, res.Stderr)
 			}
 		})
+	}
+}
+
+func TestRunExitsThreeWhenReportCannotBeWritten(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+
+	res := clitest.Run(t, clitest.Options{Dir: dir}, "run")
+	if res.Code != 3 {
+		t.Fatalf("exit code = %d, want 3; stderr:\n%s", res.Code, res.Stderr)
+	}
+	if !strings.Contains(res.Stderr, "write json report") {
+		t.Errorf("stderr does not explain the failure:\n%s", res.Stderr)
 	}
 }

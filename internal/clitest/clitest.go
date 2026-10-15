@@ -15,16 +15,12 @@ import (
 	"qgate/internal/cli"
 )
 
-// DefaultReportPath is where `qgate run` writes the JSON report when no
-// output is configured, relative to the working directory.
-const DefaultReportPath = "qgate-report.json"
-
 // Result is what one CLI invocation produced.
 type Result struct {
 	Code   int
 	Stdout string
 	Stderr string
-	// Report is the raw JSON report at DefaultReportPath, or nil if none was written.
+	// Report is the raw JSON report at cli.DefaultReportPath, or nil if none was written.
 	Report []byte
 }
 
@@ -51,7 +47,7 @@ func Run(t *testing.T, opts Options, args ...string) Result {
 		Stderr: &stderr,
 	})
 	res := Result{Code: code, Stdout: stdout.String(), Stderr: stderr.String()}
-	data, err := os.ReadFile(filepath.Join(dir, DefaultReportPath))
+	data, err := os.ReadFile(filepath.Join(dir, cli.DefaultReportPath))
 	switch {
 	case err == nil:
 		res.Report = data

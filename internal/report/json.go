@@ -16,27 +16,34 @@ type JSON struct {
 }
 
 // Report writes r atomically: a reader never sees a half-written report.
-func (j JSON) Report(_ context.Context, r *model.Report) error {
+func (j JSON) Report(ctx context.Context, r *model.Report) error {
+	if err := j.write(ctx, r); err != nil {
+		return fmt.Errorf("write json report %s: %w", j.Path, err)
+	}
+	return nil
+}
+
+func (j JSON) write(ctx context.Context, r *model.Report) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	data, err := json.MarshalIndent(r, "", "  ")
 	if err != nil {
-		return fmt.Errorf("encode json report: %w", err)
+		return err
 	}
 	data = append(data, '\n')
 
 	tmp, err := os.CreateTemp(filepath.Dir(j.Path), ".qgate-report-*.json")
 	if err != nil {
-		return fmt.Errorf("write json report: %w", err)
+		return err
 	}
 	defer os.Remove(tmp.Name()) // no-op after a successful rename
 	if _, err := tmp.Write(data); err != nil {
 		tmp.Close()
-		return fmt.Errorf("write json report: %w", err)
+		return err
 	}
 	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("write json report: %w", err)
+		return err
 	}
-	if err := os.Rename(tmp.Name(), j.Path); err != nil {
-		return fmt.Errorf("write json report: %w", err)
-	}
-	return nil
+	return os.Rename(tmp.Name(), j.Path)
 }

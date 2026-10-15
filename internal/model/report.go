@@ -22,9 +22,9 @@ type GatingScope string
 
 // Gating scopes.
 const (
-	ScopeDiff  GatingScope = "diff"
-	ScopeFiles GatingScope = "files"
-	ScopeRepo  GatingScope = "repo"
+	GatingScopeDiff  GatingScope = "diff"
+	GatingScopeFiles GatingScope = "files"
+	GatingScopeRepo  GatingScope = "repo"
 )
 
 // Outcome is the result of evaluating a gate.
@@ -61,7 +61,7 @@ type Run struct {
 	DurationMS  int64       `json:"duration_ms"`
 	Stage       string      `json:"stage"`
 	Enforcement Enforcement `json:"enforcement"`
-	Scope       GatingScope `json:"scope"`
+	GatingScope GatingScope `json:"scope"`
 	BaseSHA     string      `json:"base_sha,omitempty"`
 	HeadSHA     string      `json:"head_sha,omitempty"`
 	PR          int         `json:"pr,omitempty"`

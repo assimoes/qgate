@@ -23,18 +23,7 @@
         "scope": { "enum": ["diff", "files", "repo"] },
         "base_sha": { "type": "string" },
         "head_sha": { "type": "string" },
-        "pr": { "type": "integer", "minimum": 1 },
-        "ci": {
-          "type": "object",
-          "properties": {
-            "provider": { "type": "string" },
-            "job_url": { "type": "string" }
-          }
-        },
-        "timings_ms": {
-          "type": "object",
-          "additionalProperties": { "type": "integer", "minimum": 0 }
-        }
+        "pr": { "type": "integer", "minimum": 1 }
       }
     },
     "config_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
