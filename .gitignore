@@ -1,0 +1,4 @@
+/qgate
+qgate-report.json
+.qgate/cache/
+.qgate/debug/

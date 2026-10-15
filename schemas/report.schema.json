@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://qgate.internal/schemas/report.schema.json",
+  "title": "qgate report",
+  "description": "The canonical record of one qgate run (design §14.2).",
+  "type": "object",
+  "required": [
+    "schema_version", "qgate_version", "run", "config_hash", "resolved_config",
+    "scoring", "inputs", "agents", "findings", "metrics", "scores", "gate", "data_egress"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "qgate_version": { "type": "string", "minLength": 1 },
+    "run": {
+      "type": "object",
+      "required": ["id", "started_at", "duration_ms", "stage", "enforcement", "scope"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+        "started_at": { "type": "string", "format": "date-time" },
+        "duration_ms": { "type": "integer", "minimum": 0 },
+        "stage": { "type": "string", "minLength": 1 },
+        "enforcement": { "enum": ["advisory", "blocking"] },
+        "scope": { "enum": ["diff", "files", "repo"] },
+        "base_sha": { "type": "string" },
+        "head_sha": { "type": "string" },
+        "pr": { "type": "integer", "minimum": 1 },
+        "ci": {
+          "type": "object",
+          "properties": {
+            "provider": { "type": "string" },
+            "job_url": { "type": "string" }
+          }
+        },
+        "timings_ms": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "config_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "resolved_config": { "type": "object" },
+    "scoring": {
+      "type": "object",
+      "required": ["version", "params"],
+      "properties": {
+        "version": { "type": "integer", "minimum": 1 },
+        "params": { "type": "object" }
+      }
+    },
+    "inputs": { "type": "array", "items": { "type": "object" } },
+    "agents": { "type": "array", "items": { "type": "object" } },
+    "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
+    "metrics": { "type": "array", "items": { "$ref": "#/$defs/metric" } },
+    "scores": {
+      "type": "object",
+      "required": ["overall", "categories"],
+      "properties": {
+        "overall": { "type": ["integer", "null"], "minimum": 0, "maximum": 100 },
+        "categories": {
+          "type": "object",
+          "additionalProperties": { "type": ["integer", "null"], "minimum": 0, "maximum": 100 }
+        }
+      }
+    },
+    "gate": {
+      "type": "object",
+      "required": ["outcome", "degraded", "checks"],
+      "properties": {
+        "outcome": { "enum": ["pass", "warn", "fail"] },
+        "degraded": { "type": "boolean" },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["check", "expected", "result"],
+            "properties": {
+              "check": { "type": "string" },
+              "expected": { "type": "string" },
+              "actual": {},
+              "result": { "enum": ["pass", "fail", "skipped"] },
+              "note": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "data_egress": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["provider", "files"],
+        "properties": {
+          "provider": { "type": "string" },
+          "files": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "severity": { "enum": ["info", "low", "medium", "high", "critical"] },
+    "source": {
+      "type": "object",
+      "required": ["kind", "name"],
+      "properties": {
+        "kind": { "enum": ["tool", "agent"] },
+        "name": { "type": "string" },
+        "version": { "type": "string" }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "required": ["fingerprint", "rule_id", "category", "severity", "title", "message", "location", "source", "status"],
+      "properties": {
+        "fingerprint": { "type": "string" },
+        "rule_id": { "type": "string" },
+        "category": { "type": "string" },
+        "severity": { "$ref": "#/$defs/severity" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "location": {
+          "type": "object",
+          "required": ["path", "start_line", "end_line"],
+          "properties": {
+            "path": { "type": "string" },
+            "start_line": { "type": "integer", "minimum": 0 },
+            "end_line": { "type": "integer", "minimum": 0 },
+            "start_col": { "type": "integer", "minimum": 0 },
+            "end_col": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "cwe": { "type": "array", "items": { "type": "string" } },
+        "source": { "$ref": "#/$defs/source" },
+        "confidence": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "suggestion": {
+          "type": "object",
+          "required": ["description", "start_line", "end_line", "replacement"],
+          "properties": {
+            "description": { "type": "string" },
+            "start_line": { "type": "integer" },
+            "end_line": { "type": "integer" },
+            "replacement": { "type": "string" }
+          }
+        },
+        "status": { "enum": ["new", "out_of_scope", "baseline", "suppressed", "superseded", "invalid"] },
+        "status_note": { "type": "string" },
+        "annotations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["agent", "explanation"],
+            "properties": {
+              "agent": { "type": "string" },
+              "verdict": { "enum": ["likely_true", "likely_false_positive", "uncertain"] },
+              "explanation": { "type": "string" }
+            }
+          }
+        },
+        "merged_sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["input", "rule_id", "fingerprint", "severity"],
+            "properties": {
+              "input": { "type": "string" },
+              "rule_id": { "type": "string" },
+              "fingerprint": { "type": "string" },
+              "severity": { "$ref": "#/$defs/severity" }
+            }
+          }
+        }
+      }
+    },
+    "metric": {
+      "type": "object",
+      "required": ["name", "value", "unit", "scope", "source"],
+      "properties": {
+        "name": { "type": "string" },
+        "value": { "type": "number" },
+        "unit": { "type": "string" },
+        "scope": { "type": "string", "pattern": "^(diff|repo|file:.+)$" },
+        "source": { "$ref": "#/$defs/source" }
+      }
+    }
+  }
+}
