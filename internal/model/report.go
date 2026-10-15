@@ -27,6 +27,15 @@ const (
 	GatingScopeRepo  GatingScope = "repo"
 )
 
+// AgentKind is the role an agent plays.
+type AgentKind string
+
+// Agent kinds.
+const (
+	AgentKindReviewer AgentKind = "reviewer" // reads changed code and produces findings
+	AgentKindTriager  AgentKind = "triager"  // annotates existing findings
+)
+
 // Outcome is the result of evaluating a gate.
 type Outcome string
 
@@ -86,9 +95,9 @@ type InputStatus struct {
 
 // AgentStatus summarizes one agent's run.
 type AgentStatus struct {
-	Name   string `json:"name"`
-	Kind   string `json:"kind"`
-	Status string `json:"status"`
+	Name   string    `json:"name"`
+	Kind   AgentKind `json:"kind"`
+	Status string    `json:"status"`
 }
 
 // Scores are reported as whole points; nil means not assessed.

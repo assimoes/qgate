@@ -3,7 +3,6 @@ package cli
 import (
 	"bytes"
 	"fmt"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -20,15 +19,8 @@ func (a app) newValidateCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			source := "builtin defaults only"
-			if res.RepoConfig != "" {
-				source = res.RepoConfig
-				if rel, err := filepath.Rel(a.inv.Dir, source); err == nil && filepath.IsLocal(rel) {
-					source = rel
-				}
-			}
 			var out bytes.Buffer
-			fmt.Fprintf(&out, "# qgate resolved config for stage %q from %s\n", res.Config.Stage, source)
+			fmt.Fprintf(&out, "# qgate resolved config for stage %q from %s\n", res.Config.Stage, res.Source)
 			enc := yaml.NewEncoder(&out)
 			enc.SetIndent(2)
 			if err := enc.Encode(res.Document); err != nil {

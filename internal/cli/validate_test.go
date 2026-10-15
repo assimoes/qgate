@@ -156,7 +156,7 @@ func TestValidateRejectsSchemaViolations(t *testing.T) {
 		{
 			name:   "unknown key (typo)",
 			config: "version: 1\nscoring:\n  agent_max_penatly: 15\n",
-			want:   []string{".qgate.yaml: scoring:", "agent_max_penatly"},
+			want:   []string{".qgate.yaml: scoring.agent_max_penatly: unknown property"},
 		},
 		{
 			name:   "wrong type",
@@ -176,7 +176,7 @@ func TestValidateRejectsSchemaViolations(t *testing.T) {
 		{
 			name:   "API key written inline instead of by variable name",
 			config: "version: 1\nproviders:\n  a:\n    type: anthropic\n    api_key: sk-123\n",
-			want:   []string{".qgate.yaml: providers.a:", "api_key"},
+			want:   []string{".qgate.yaml: providers.a.api_key: unknown property"},
 		},
 		{
 			name:   "unknown key in a profile",
@@ -430,7 +430,7 @@ func TestSetRejectsInvalidOverrides(t *testing.T) {
 		{name: "violates the schema", config: "version: 1\n", args: []string{"--set", "profile.enforcement=sometimes"},
 			want: []string{"--set: profile.enforcement:", "advisory"}},
 		{name: "unknown key", config: "version: 1\n", args: []string{"--set", "profile.gate.overal_min=80"},
-			want: []string{"--set: profile.gate:", "overal_min"}},
+			want: []string{"--set: profile.gate.overal_min: unknown property"}},
 	})
 }
 
@@ -475,4 +475,50 @@ review_rules:
 			t.Errorf("exit code = %d, stderr:\n%s", res.Code, res.Stderr)
 		}
 	})
+}
+
+func TestUnknownKeysAreReportedAtTheirOwnPath(t *testing.T) {
+	t.Parallel()
+	runConfigErrorCases(t, []configErrorCase{
+		{name: "top level", config: "version: 1\nfoo: 1\n",
+			want: []string{".qgate.yaml: foo: unknown property"}},
+		{name: "nested", config: "version: 1\nproviders:\n  p:\n    type: anthropic\n    api_key: sk-1\n",
+			want: []string{".qgate.yaml: providers.p.api_key: unknown property"}},
+	})
+}
+
+func TestFallbackMustNameAKnownProvider(t *testing.T) {
+	t.Parallel()
+	runConfigErrorCases(t, []configErrorCase{
+		{name: "unknown fallback provider",
+			config: "version: 1\nproviders:\n  a: { type: anthropic, fallback: zzz/some-model }\n",
+			want:   []string{".qgate.yaml: providers.a.fallback:", `unknown provider "zzz"`}},
+	})
+}
+
+func TestSetErrorsReportOnlyTheRealProblem(t *testing.T) {
+	t.Parallel()
+	for _, set := range []string{"profile.gate.overall_min=abc", "profile.gate.max_new.critical=-1"} {
+		t.Run(set, func(t *testing.T) {
+			t.Parallel()
+			res := clitest.Run(t, clitest.Options{}, "validate", "--set", set)
+			if res.Code != 2 {
+				t.Fatalf("exit code = %d, want 2; stderr:\n%s", res.Code, res.Stderr)
+			}
+			key := strings.SplitN(set, "=", 2)[0]
+			for _, line := range strings.Split(strings.TrimSpace(res.Stderr), "\n")[1:] {
+				if !strings.Contains(line, key) {
+					t.Errorf("spurious error line %q for --set %s", line, set)
+				}
+			}
+		})
+	}
+}
+
+func TestSetCannotChangeTheStage(t *testing.T) {
+	t.Parallel()
+	res := clitest.Run(t, clitest.Options{}, "validate", "--set", "stage=prod")
+	if res.Code != 2 || !strings.Contains(res.Stderr, "--stage") {
+		t.Errorf("exit code = %d, want 2 pointing at --stage; stderr:\n%s", res.Code, res.Stderr)
+	}
 }

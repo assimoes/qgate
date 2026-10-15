@@ -53,3 +53,19 @@ The builtin `scoring.category_weights` are the reference values plus `dependenci
 ## 2026-10-15 — Config errors are printed plainly
 
 The final error of a run is printed to stderr as `qgate: <message>` rather than as a structured log record, because it is read by a human in a CI log. Config errors list every problem, one per line, as `<file>: <dotted.path>: <message>`.
+
+## 2026-10-16 — `golang.org/x/text` as a direct dependency
+
+The config validator renders schema errors with `jsonschema`'s `LocalizedString`, which takes a `golang.org/x/text/message` printer. `x/text` is already a dependency of `santhosh-tekuri/jsonschema/v6` (design §3.2), so importing it directly adds nothing to the build.
+
+## 2026-10-16 — `llm.allowed_providers` is checked in ticket 30
+
+Design §5.2 lists "providers outside `llm.allowed_providers`" among the semantic checks. The spec and tickets place it with the egress controls (ticket 30), where it is tested alongside the rest of the data-egress policy, so ticket 02 does not check it.
+
+## 2026-10-16 — `--set` cannot change the stage
+
+`stage` in the resolved config records which profile was selected. `--set stage=…` would change the label without re-selecting the profile, so it is rejected with a pointer to `--stage`.
+
+## 2026-10-16 — Profile schemas list their properties explicitly
+
+`profile` and `resolvedProfile` repeat the profile fields with `additionalProperties: false` instead of sharing them through `$ref` plus `unevaluatedProperties: false`. With the shared form, one invalid field made every sibling field "unevaluated" and produced a false "unknown property" error for each.

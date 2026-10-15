@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
+	"github.com/santhosh-tekuri/jsonschema/v6/kind"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 
@@ -74,41 +75,25 @@ func validateSchema(sch *jsonschema.Schema, doc map[string]any, file string) (Er
 
 	var errs Errors
 	for _, leaf := range leaves(ve) {
-		errs = append(errs, Error{
-			File:    file,
-			Path:    instancePath(doc, leaf.InstanceLocation),
-			Message: leaf.ErrorKind.LocalizedString(printer),
-		})
+		at := instancePath(doc, leaf.InstanceLocation)
+		// Report each unknown key at its own path, not its parent's.
+		if ap, ok := leaf.ErrorKind.(*kind.AdditionalProperties); ok {
+			for _, prop := range ap.Properties {
+				errs = append(errs, Error{File: file, Path: joinPath(at, prop), Message: "unknown property"})
+			}
+			continue
+		}
+		errs = append(errs, Error{File: file, Path: at, Message: leaf.ErrorKind.LocalizedString(printer)})
 	}
 	sort.SliceStable(errs, func(i, j int) bool { return errs[i].Path < errs[j].Path })
-	return dedupe(explainUnevaluated(errs)), nil
+	return dedupe(errs), nil
 }
 
-// falseSchema is how the validator reports a property rejected by
-// unevaluatedProperties: false (used by profiles, which extend shared fields).
-const falseSchema = "false schema"
-
-// explainUnevaluated rewrites "false schema" into "unknown property", and
-// drops it where the same path already has a more specific error: a property
-// that fails its own schema also counts as unevaluated.
-func explainUnevaluated(errs Errors) Errors {
-	specific := map[string]bool{}
-	for _, e := range errs {
-		if e.Message != falseSchema {
-			specific[e.Path] = true
-		}
+func joinPath(parent, key string) string {
+	if parent == "" {
+		return key
 	}
-	out := errs[:0]
-	for _, e := range errs {
-		if e.Message == falseSchema {
-			if specific[e.Path] {
-				continue
-			}
-			e.Message = "unknown property"
-		}
-		out = append(out, e)
-	}
-	return out
+	return parent + "." + key
 }
 
 // leaves returns the most specific causes of a validation error.

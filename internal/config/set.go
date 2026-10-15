@@ -16,6 +16,10 @@ func applySets(doc map[string]any, sets []string) Errors {
 			errs = append(errs, errorf(setSource, "", "%q is not of the form path=value", s))
 			continue
 		}
+		if key == "stage" {
+			errs = append(errs, errorf(setSource, key, "the stage selects the profile; use --stage instead"))
+			continue
+		}
 		val, err := parseScalar(raw)
 		if err != nil {
 			errs = append(errs, errorf(setSource, key, "invalid value: %v", err))

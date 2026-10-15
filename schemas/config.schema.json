@@ -295,11 +295,16 @@
         "critical": { "$ref": "#/$defs/nonNegativeInt" }
       }
     },
-    "profileFields": {
+    "enforcement": { "enum": ["advisory", "blocking"] },
+    "gatingScope": { "enum": ["diff", "files", "repo"] },
+    "profile": {
+      "description": "Keep the properties in step with resolvedProfile, which adds no extends and requires every field.",
       "type": "object",
+      "additionalProperties": false,
       "properties": {
-        "enforcement": { "enum": ["advisory", "blocking"] },
-        "scope": { "enum": ["diff", "files", "repo"] },
+        "extends": { "$ref": "#/$defs/name" },
+        "enforcement": { "$ref": "#/$defs/enforcement" },
+        "scope": { "$ref": "#/$defs/gatingScope" },
         "agents": { "type": "array", "items": { "$ref": "#/$defs/name" } },
         "on_input_error": { "$ref": "#/$defs/errorPolicy" },
         "on_agent_error": { "$ref": "#/$defs/errorPolicy" },
@@ -307,15 +312,19 @@
         "gate": { "$ref": "#/$defs/gate" }
       }
     },
-    "profile": {
-      "$ref": "#/$defs/profileFields",
-      "unevaluatedProperties": false,
-      "properties": { "extends": { "$ref": "#/$defs/name" } }
-    },
     "resolvedProfile": {
-      "$ref": "#/$defs/profileFields",
-      "unevaluatedProperties": false,
-      "required": ["enforcement", "scope", "agents", "on_input_error", "on_agent_error", "gate"]
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enforcement", "scope", "agents", "on_input_error", "on_agent_error", "gate"],
+      "properties": {
+        "enforcement": { "$ref": "#/$defs/enforcement" },
+        "scope": { "$ref": "#/$defs/gatingScope" },
+        "agents": { "type": "array", "items": { "$ref": "#/$defs/name" } },
+        "on_input_error": { "$ref": "#/$defs/errorPolicy" },
+        "on_agent_error": { "$ref": "#/$defs/errorPolicy" },
+        "agent_context_findings": { "type": "boolean" },
+        "gate": { "$ref": "#/$defs/gate" }
+      }
     },
     "reporting": {
       "type": "object",

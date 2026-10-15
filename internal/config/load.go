@@ -5,6 +5,7 @@ package config
 
 import (
 	"bytes"
+	"context"
 	_ "embed"
 	"encoding/json"
 	"errors"
@@ -19,8 +20,8 @@ var builtinYAML []byte
 
 const builtinSource = "builtin defaults"
 
-// RepoConfigNames are the repo config files looked up in the repo root, in order.
-var RepoConfigNames = []string{".qgate.yaml", ".qgate.yml"}
+// repoConfigNames are the repo config files looked up in the repo root, in order.
+var repoConfigNames = [...]string{".qgate.yaml", ".qgate.yml"}
 
 // Options say where to find configuration and how to resolve it.
 type Options struct {
@@ -36,6 +37,9 @@ type Resolved struct {
 	// RepoConfig is the repo config file used, or "" when only builtin
 	// defaults apply.
 	RepoConfig string
+	// Source names where the config came from in messages: the repo config
+	// relative to the repo root, or "builtin defaults".
+	Source string
 	// Document is the resolved config as plain values, as printed by
 	// `qgate validate` and stored in the report.
 	Document map[string]any
@@ -44,7 +48,7 @@ type Resolved struct {
 
 // Load resolves the configuration for opts.Stage. Problems with the
 // configuration are returned as Errors; anything else is an I/O failure.
-func Load(opts Options) (*Resolved, error) {
+func Load(ctx context.Context, opts Options) (*Resolved, error) {
 	sch, err := loadSchemas()
 	if err != nil {
 		return nil, err
@@ -56,14 +60,14 @@ func Load(opts Options) (*Resolved, error) {
 	}
 
 	merged := builtin
-	repoPath, err := discover(opts)
+	repoPath, err := discover(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
 	source := builtinSource
 	if repoPath != "" {
 		source = displayPath(opts.Dir, repoPath)
-		layer, err := readLayer(sch, repoPath, source, opts.Env)
+		layer, err := readLayer(ctx, sch, repoPath, source, opts.Env)
 		if err != nil {
 			return nil, err
 		}
@@ -107,16 +111,15 @@ func Load(opts Options) (*Resolved, error) {
 	if err != nil {
 		return nil, err
 	}
-	res := &Resolved{Document: doc, Config: cfg}
-	if repoPath != "" {
-		res.RepoConfig = repoPath
-	}
-	return res, nil
+	return &Resolved{RepoConfig: repoPath, Source: source, Document: doc, Config: cfg}, nil
 }
 
 // discover finds the repo config: an explicit path, else the first of
-// RepoConfigNames in the repo root, else none.
-func discover(opts Options) (string, error) {
+// repoConfigNames in the repo root, else none.
+func discover(ctx context.Context, opts Options) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 	if opts.ConfigPath != "" {
 		p := opts.ConfigPath
 		if !filepath.IsAbs(p) {
@@ -130,7 +133,7 @@ func discover(opts Options) (string, error) {
 		}
 		return p, nil
 	}
-	for _, name := range RepoConfigNames {
+	for _, name := range repoConfigNames {
 		p := filepath.Join(opts.Dir, name)
 		_, err := os.Stat(p)
 		switch {
@@ -144,7 +147,10 @@ func discover(opts Options) (string, error) {
 }
 
 // readLayer reads, validates and interpolates one config file.
-func readLayer(sch *compiledSchemas, p, source string, env map[string]string) (map[string]any, error) {
+func readLayer(ctx context.Context, sch *compiledSchemas, p, source string, env map[string]string) (map[string]any, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	data, err := os.ReadFile(p)
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", source, err)

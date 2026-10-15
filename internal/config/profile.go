@@ -1,6 +1,7 @@
 package config
 
 import (
+	"slices"
 	"strings"
 )
 
@@ -27,41 +28,29 @@ func resolveProfile(profiles map[string]any, stage, file string) (map[string]any
 
 	// Walk from the selected profile to the root of its chain.
 	var chain []map[string]any
-	seen := map[string]bool{}
+	var names []string
 	for name := stage; name != ""; {
-		if seen[name] {
+		if slices.Contains(names, name) {
 			return nil, Errors{errorf(file, path{"profiles", name, "extends"}.String(),
-				"extends cycle: %s", strings.Join(append(chainNames(chain), name), " → "))}
+				"extends cycle: %s", strings.Join(append(names, name), " → "))}
 		}
-		seen[name] = true
 		p, ok := profiles[name].(map[string]any)
 		if !ok {
-			from := chainNames(chain)[len(chain)-1]
-			return nil, Errors{errorf(file, path{"profiles", from, "extends"}.String(),
+			return nil, Errors{errorf(file, path{"profiles", names[len(names)-1], "extends"}.String(),
 				"extends unknown profile %q", name)}
 		}
-		p = deepCopy(p).(map[string]any)
-		p["$name"] = name
+		names = append(names, name)
 		chain = append(chain, p)
 		name, _ = p["extends"].(string)
 	}
 
 	resolved := profileDefaults()
-	for i := len(chain) - 1; i >= 0; i-- {
-		p := chain[i]
+	for _, p := range slices.Backward(chain) {
+		p = deepCopy(p).(map[string]any)
 		delete(p, "extends")
-		delete(p, "$name")
 		resolved = deepMerge(resolved, p).(map[string]any)
 	}
 	return resolved, nil
-}
-
-func chainNames(chain []map[string]any) []string {
-	names := make([]string, len(chain))
-	for i, p := range chain {
-		names[i], _ = p["$name"].(string)
-	}
-	return names
 }
 
 // checkProfiles reports every profile whose extends chain is broken, not

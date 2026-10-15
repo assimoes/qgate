@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"qgate/internal/model"
 )
 
 // BuiltinScheme prefixes references to builtin prompts.
@@ -13,16 +15,16 @@ const BuiltinScheme = "builtin://"
 
 // builtin describes one builtin prompt.
 type builtin struct {
-	kind     string // agent kind it is written for
-	versions int    // versions 1..versions exist
+	kind     model.AgentKind // agent kind it is written for
+	versions int             // versions 1..versions exist
 }
 
 // builtins is the catalog of builtin prompts. Adding a prompt or a version
 // means adding an entry here and its text, never editing a released one.
 var builtins = map[string]builtin{
-	"security-reviewer": {kind: "reviewer", versions: 1},
-	"quality-reviewer":  {kind: "reviewer", versions: 1},
-	"triage":            {kind: "triager", versions: 1},
+	"security-reviewer": {kind: model.AgentKindReviewer, versions: 1},
+	"quality-reviewer":  {kind: model.AgentKindReviewer, versions: 1},
+	"triage":            {kind: model.AgentKindTriager, versions: 1},
 }
 
 // Ref identifies a builtin prompt version, e.g. builtin://triage@1.
@@ -50,7 +52,7 @@ func ParseBuiltin(base string) (ref Ref, ok bool, err error) {
 }
 
 // Kind returns the agent kind a builtin prompt version is written for.
-func Kind(ref Ref) (string, error) {
+func Kind(ref Ref) (model.AgentKind, error) {
 	b, ok := builtins[ref.Name]
 	if !ok {
 		return "", fmt.Errorf("unknown builtin prompt %q", ref.Name)

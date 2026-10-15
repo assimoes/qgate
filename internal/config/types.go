@@ -170,7 +170,7 @@ type CategoryMatch struct {
 
 // Agent configures one reviewer or triager.
 type Agent struct {
-	Kind               string           `json:"kind"`
+	Kind               model.AgentKind  `json:"kind"`
 	Provider           string           `json:"provider"`
 	Model              string           `json:"model"`
 	Prompt             Prompt           `json:"prompt"`

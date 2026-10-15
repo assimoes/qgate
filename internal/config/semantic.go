@@ -2,9 +2,11 @@ package config
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/bmatcuk/doublestar/v4"
 
+	"qgate/internal/model"
 	"qgate/internal/prompts"
 )
 
@@ -16,7 +18,7 @@ var builtinCategories = []string{"security", "quality", "maintainability", "test
 // layer; across layers the same key merges instead.
 func checkDuplicates(layer map[string]any, file string) Errors {
 	var errs Errors
-	for _, list := range []string{"inputs", "review_rules"} {
+	for _, list := range sortedKeys(keyedLists) {
 		key := keyedLists[list]
 		items, _ := layer[list].([]any)
 		first := map[any]int{}
@@ -88,7 +90,16 @@ func (c *checker) mapAt(keys ...string) map[string]any {
 	return m
 }
 
-func (c *checker) listAt(m map[string]any, key string) []any {
+// eachAgent calls fn for every agent, in name order.
+func (c *checker) eachAgent(fn func(name string, agent map[string]any)) {
+	agents := c.mapAt("agents")
+	for _, name := range sortedKeys(agents) {
+		m, _ := agents[name].(map[string]any)
+		fn(name, m)
+	}
+}
+
+func listAt(m map[string]any, key string) []any {
 	l, _ := m[key].([]any)
 	return l
 }
@@ -107,26 +118,24 @@ func (c *checker) categories() {
 		}
 	}
 
-	for i, in := range c.listAt(c.doc, "inputs") {
+	for i, in := range listAt(c.doc, "inputs") {
 		m, _ := in.(map[string]any)
 		p := path{"inputs"}.index(i)
 		check(p.key("category_default"), m["category_default"])
-		for j, a := range c.listAt(m, "assesses") {
+		for j, a := range listAt(m, "assesses") {
 			check(p.key("assesses").index(j), a)
 		}
 	}
-	for i, cm := range c.listAt(c.doc, "category_mappings") {
+	for i, cm := range listAt(c.doc, "category_mappings") {
 		m, _ := cm.(map[string]any)
 		check(path{"category_mappings"}.index(i).key("category"), m["category"])
 	}
-	agents := c.mapAt("agents")
-	for _, name := range sortedKeys(agents) {
-		m, _ := agents[name].(map[string]any)
-		for j, cat := range c.listAt(m, "categories") {
+	c.eachAgent(func(name string, m map[string]any) {
+		for j, cat := range listAt(m, "categories") {
 			check(path{"agents", name, "categories"}.index(j), cat)
 		}
-	}
-	for i, rr := range c.listAt(c.doc, "review_rules") {
+	})
+	for i, rr := range listAt(c.doc, "review_rules") {
 		m, _ := rr.(map[string]any)
 		check(path{"review_rules"}.index(i).key("category"), m["category"])
 	}
@@ -136,7 +145,7 @@ func (c *checker) categories() {
 		for _, cat := range sortedKeys(catMin) {
 			check(prof.p.key("gate").key("category_min").key(cat), cat)
 		}
-		for j, cat := range c.listAt(gate, "require_assessed") {
+		for j, cat := range listAt(gate, "require_assessed") {
 			check(prof.p.key("gate").key("require_assessed").index(j), cat)
 		}
 	}
@@ -144,36 +153,43 @@ func (c *checker) categories() {
 
 func (c *checker) providerRefs() {
 	providers := c.mapAt("providers")
-	agents := c.mapAt("agents")
-	for _, name := range sortedKeys(agents) {
-		m, _ := agents[name].(map[string]any)
+	for _, name := range sortedKeys(providers) {
+		m, _ := providers[name].(map[string]any)
+		if fb, ok := m["fallback"].(string); ok {
+			target, _, _ := strings.Cut(fb, "/")
+			if _, found := providers[target]; !found {
+				c.fail(path{"providers", name, "fallback"}, "unknown provider %q", target)
+			}
+		}
+	}
+	c.eachAgent(func(name string, m map[string]any) {
 		if p, ok := m["provider"].(string); ok {
 			if _, found := providers[p]; !found {
 				c.fail(path{"agents", name, "provider"}, "unknown provider %q", p)
 			}
 		}
-	}
+	})
 }
 
 func (c *checker) agentRefs() {
 	agents := c.mapAt("agents")
 	for _, prof := range c.profiles() {
-		for j, a := range c.listAt(prof.m, "agents") {
+		for j, a := range listAt(prof.m, "agents") {
 			if s, _ := a.(string); agents[s] == nil {
 				c.fail(prof.p.key("agents").index(j), "unknown agent %q", s)
 			}
 		}
 	}
-	for i, rr := range c.listAt(c.doc, "review_rules") {
+	for i, rr := range listAt(c.doc, "review_rules") {
 		m, _ := rr.(map[string]any)
-		for j, a := range c.listAt(m, "agents") {
+		for j, a := range listAt(m, "agents") {
 			p := path{"review_rules"}.index(i).key("agents").index(j)
 			s, _ := a.(string)
 			agent, _ := agents[s].(map[string]any)
 			switch {
 			case agent == nil:
 				c.fail(p, "unknown agent %q", s)
-			case agent["kind"] != "reviewer":
+			case agent["kind"] != string(model.AgentKindReviewer):
 				c.fail(p, "agent %q is a %v; review rules are given to reviewers", s, agent["kind"])
 			}
 		}
@@ -181,29 +197,27 @@ func (c *checker) agentRefs() {
 }
 
 func (c *checker) agentKinds() {
-	agents := c.mapAt("agents")
-	for _, name := range sortedKeys(agents) {
-		m, _ := agents[name].(map[string]any)
+	c.eachAgent(func(name string, m map[string]any) {
 		prompt, _ := m["prompt"].(map[string]any)
 		base, _ := prompt["base"].(string)
 		p := path{"agents", name, "prompt", "base"}
 		ref, isBuiltin, err := prompts.ParseBuiltin(base)
 		if !isBuiltin {
-			continue
+			return
 		}
 		if err != nil {
 			c.fail(p, "%v", err)
-			continue
+			return
 		}
 		kind, err := prompts.Kind(ref)
 		if err != nil {
 			c.fail(p, "%v", err)
-			continue
+			return
 		}
-		if m["kind"] != kind {
+		if m["kind"] != string(kind) {
 			c.fail(p, "builtin prompt %s is for a %s, but agent %q is a %v", ref.Name, kind, name, m["kind"])
 		}
-	}
+	})
 }
 
 func (c *checker) globs() {
@@ -218,25 +232,23 @@ func (c *checker) globs() {
 		}
 	}
 	project := c.mapAt("project")
-	checkList(path{"project", "include"}, c.listAt(project, "include"))
-	checkList(path{"project", "exclude"}, c.listAt(project, "exclude"))
-	checkList(path{"llm", "exclude_paths"}, c.listAt(c.mapAt("llm"), "exclude_paths"))
+	checkList(path{"project", "include"}, listAt(project, "include"))
+	checkList(path{"project", "exclude"}, listAt(project, "exclude"))
+	checkList(path{"llm", "exclude_paths"}, listAt(c.mapAt("llm"), "exclude_paths"))
 
-	agents := c.mapAt("agents")
-	for _, name := range sortedKeys(agents) {
-		m, _ := agents[name].(map[string]any)
-		checkList(path{"agents", name, "priority_paths"}, c.listAt(m, "priority_paths"))
-	}
+	c.eachAgent(func(name string, m map[string]any) {
+		checkList(path{"agents", name, "priority_paths"}, listAt(m, "priority_paths"))
+	})
 	for _, list := range []string{"review_rules", "suppressions"} {
-		for i, it := range c.listAt(c.doc, list) {
+		for i, it := range listAt(c.doc, list) {
 			m, _ := it.(map[string]any)
-			checkList(path{list}.index(i).key("paths"), c.listAt(m, "paths"))
+			checkList(path{list}.index(i).key("paths"), listAt(m, "paths"))
 			if list == "suppressions" {
 				check(path{list}.index(i).key("rule"), m["rule"])
 			}
 		}
 	}
-	for i, cm := range c.listAt(c.doc, "category_mappings") {
+	for i, cm := range listAt(c.doc, "category_mappings") {
 		m, _ := cm.(map[string]any)
 		match, _ := m["match"].(map[string]any)
 		for _, k := range []string{"rule_id", "path"} {

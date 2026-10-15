@@ -7,7 +7,7 @@
 **Status:** ready-for-agent
 
 - [ ] Repo config is discovered via flag, `QGATE_CONFIG`, then `.qgate.yaml` / `.qgate.yml`; flags beat env
-- [ ] `qgate validate --stage staging` prints the resolved config for the design doc's reference config without network access
+- [ ] `qgate validate --stage staging` prints the resolved config for the design doc's reference config without network access, given the environment variables it interpolates (an unset one is a config error)
 - [ ] Invalid configs exit 2 with file, dotted path and a readable message
 - [ ] Semantic checks reject unknown provider/agent/category references, duplicate input names, invalid globs and agent `kind` mismatches (exit 2)
 - [ ] `extends` resolves single inheritance; a cycle exits 2; an abstract profile can be selected with `--stage`

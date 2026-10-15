@@ -35,7 +35,7 @@ func (a app) load(cmd *cobra.Command, f configFlags) (*config.Resolved, error) {
 	if !cmd.Flags().Changed("config") {
 		configPath = a.inv.Env["QGATE_CONFIG"]
 	}
-	res, err := config.Load(config.Options{
+	res, err := config.Load(cmd.Context(), config.Options{
 		Dir:        a.inv.Dir,
 		Env:        a.inv.Env,
 		ConfigPath: configPath,
