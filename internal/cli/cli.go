@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 
 	"github.com/spf13/cobra"
 )
@@ -20,6 +21,8 @@ type Invocation struct {
 	Dir    string // working directory; relative paths resolve against it
 	Stdout io.Writer
 	Stderr io.Writer
+	// HTTP makes qgate's outbound HTTP requests; nil uses a default client.
+	HTTP *http.Client
 }
 
 // app carries what every command needs.

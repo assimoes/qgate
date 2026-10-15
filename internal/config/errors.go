@@ -49,3 +49,14 @@ func (es Errors) orNil() error {
 func errorf(file, path, format string, args ...any) Error {
 	return Error{File: file, Path: path, Message: fmt.Sprintf(format, args...)}
 }
+
+// blame builds an Error for a path in a document, naming the source
+// responsible for it.
+type blame func(p path, format string, args ...any) Error
+
+// blameSource blames a single, fixed source.
+func blameSource(source string) blame {
+	return func(p path, format string, args ...any) Error {
+		return errorf(source, p.String(), format, args...)
+	}
+}

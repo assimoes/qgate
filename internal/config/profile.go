@@ -20,9 +20,9 @@ func profileDefaults() map[string]any {
 
 // resolveProfile returns the profile a stage selects, with its extends chain
 // merged root-first onto the defaults.
-func resolveProfile(profiles map[string]any, stage, file string) (map[string]any, Errors) {
+func resolveProfile(profiles map[string]any, stage string, blame blame) (map[string]any, Errors) {
 	if _, ok := profiles[stage]; !ok {
-		return nil, Errors{errorf(file, "", "unknown stage %q: no profile with that name (profiles: %s)",
+		return nil, Errors{blame(nil, "unknown stage %q: no profile with that name (profiles: %s)",
 			stage, strings.Join(sortedKeys(profiles), ", "))}
 	}
 
@@ -31,12 +31,12 @@ func resolveProfile(profiles map[string]any, stage, file string) (map[string]any
 	var names []string
 	for name := stage; name != ""; {
 		if slices.Contains(names, name) {
-			return nil, Errors{errorf(file, path{"profiles", name, "extends"}.String(),
+			return nil, Errors{blame(path{"profiles", name, "extends"},
 				"extends cycle: %s", strings.Join(append(names, name), " → "))}
 		}
 		p, ok := profiles[name].(map[string]any)
 		if !ok {
-			return nil, Errors{errorf(file, path{"profiles", names[len(names)-1], "extends"}.String(),
+			return nil, Errors{blame(path{"profiles", names[len(names)-1], "extends"},
 				"extends unknown profile %q", name)}
 		}
 		names = append(names, name)
@@ -55,10 +55,10 @@ func resolveProfile(profiles map[string]any, stage, file string) (map[string]any
 
 // checkProfiles reports every profile whose extends chain is broken, not
 // only the selected one, so a typo in an unused profile is still caught.
-func checkProfiles(profiles map[string]any, file string) Errors {
+func checkProfiles(profiles map[string]any, blame blame) Errors {
 	var errs Errors
 	for _, name := range sortedKeys(profiles) {
-		if _, e := resolveProfile(profiles, name, file); len(e) > 0 {
+		if _, e := resolveProfile(profiles, name, blame); len(e) > 0 {
 			errs = append(errs, e...)
 		}
 	}

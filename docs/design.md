@@ -73,7 +73,7 @@ The CLI exposes one in-process entry point — context, args, env, working direc
 | Command | Purpose |
 |---|---|
 | `run` | Full pipeline; the CI entrypoint. |
-| `validate` | Print the resolved config for a stage. No network. |
+| `validate` | Print the resolved config for a stage. No network, except fetching an `--org-config` URL. |
 | `doctor` | Check git context, input files, provider probes (§10.4), VCS token scopes. |
 | `score --report <file>` | Recompute scores and gate from a saved report. No analyzers, no LLM. |
 | `baseline create` | Write a baseline of current fingerprints (§9.1). |

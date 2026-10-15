@@ -38,8 +38,8 @@ func checkDuplicates(layer map[string]any, file string) Errors {
 
 // checkSemantics reports references to things that do not exist, invalid
 // globs and agent kinds that contradict their builtin prompt.
-func checkSemantics(doc map[string]any, file string) Errors {
-	c := checker{doc: doc, file: file}
+func checkSemantics(doc map[string]any, blame blame) Errors {
+	c := checker{doc: doc, blame: blame}
 	c.categories()
 	c.providerRefs()
 	c.agentRefs()
@@ -50,9 +50,9 @@ func checkSemantics(doc map[string]any, file string) Errors {
 }
 
 type checker struct {
-	doc  map[string]any
-	file string
-	errs Errors
+	doc   map[string]any
+	blame blame
+	errs  Errors
 }
 
 // profileAt is a profile and where it sits in the document.
@@ -77,7 +77,7 @@ func (c *checker) profiles() []profileAt {
 }
 
 func (c *checker) fail(p path, format string, args ...any) {
-	c.errs = append(c.errs, errorf(c.file, p.String(), format, args...))
+	c.errs = append(c.errs, c.blame(p, format, args...))
 }
 
 func (c *checker) mapAt(keys ...string) map[string]any {

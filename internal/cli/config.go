@@ -12,6 +12,7 @@ const defaultStage = "dev"
 
 // configFlags are the flags every command that resolves config accepts.
 type configFlags struct {
+	orgConfig  string
 	stage      string
 	configPath string
 	sets       []string
@@ -20,6 +21,7 @@ type configFlags struct {
 func (f *configFlags) register(cmd *cobra.Command) {
 	fl := cmd.Flags()
 	fl.StringVar(&f.stage, "stage", defaultStage, "stage to run; selects the profile of the same name (env QGATE_STAGE)")
+	fl.StringVar(&f.orgConfig, "org-config", "", "org config path or HTTPS URL, layered between builtin defaults and the repo config")
 	fl.StringVar(&f.configPath, "config", "", "repo config path (env QGATE_CONFIG; default .qgate.yaml or .qgate.yml in the repo root)")
 	fl.StringArrayVar(&f.sets, "set", nil, "override a resolved config value, e.g. --set profile.gate.overall_min=80 (repeatable)")
 }
@@ -38,6 +40,8 @@ func (a app) load(cmd *cobra.Command, f configFlags) (*config.Resolved, error) {
 	res, err := config.Load(cmd.Context(), config.Options{
 		Dir:        a.inv.Dir,
 		Env:        a.inv.Env,
+		OrgConfig:  f.orgConfig,
+		HTTPClient: a.inv.HTTP,
 		ConfigPath: configPath,
 		Stage:      stage,
 		Sets:       f.sets,

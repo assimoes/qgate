@@ -53,9 +53,21 @@ var loadSchemas = sync.OnceValues(func() (*compiledSchemas, error) {
 
 var printer = message.NewPrinter(language.English)
 
-// validateSchema checks doc against sch and reports each violation with the
-// file and dotted path it concerns.
-func validateSchema(sch *jsonschema.Schema, doc map[string]any, file string) (Errors, error) {
+// validation says how strictly validateSchema applies the schema.
+type validation int
+
+const (
+	// complete applies the whole schema.
+	complete validation = iota
+	// partial skips required properties below the root: a single layer
+	// may set only some fields of an agent or provider defined in another,
+	// so required fields are checked on the merged config instead.
+	partial
+)
+
+// validateSchema checks doc against sch and reports each violation at the
+// dotted path it concerns, blaming the source responsible.
+func validateSchema(sch *jsonschema.Schema, doc map[string]any, mode validation, blame blame) (Errors, error) {
 	data, err := json.Marshal(doc)
 	if err != nil {
 		return nil, fmt.Errorf("encode config: %w", err)
@@ -76,24 +88,22 @@ func validateSchema(sch *jsonschema.Schema, doc map[string]any, file string) (Er
 	var errs Errors
 	for _, leaf := range leaves(ve) {
 		at := instancePath(doc, leaf.InstanceLocation)
-		// Report each unknown key at its own path, not its parent's.
-		if ap, ok := leaf.ErrorKind.(*kind.AdditionalProperties); ok {
-			for _, prop := range ap.Properties {
-				errs = append(errs, Error{File: file, Path: joinPath(at, prop), Message: "unknown property"})
+		switch k := leaf.ErrorKind.(type) {
+		case *kind.Required:
+			if mode == partial && len(at) > 0 {
+				continue
+			}
+		case *kind.AdditionalProperties:
+			// Report each unknown key at its own path, not its parent's.
+			for _, prop := range k.Properties {
+				errs = append(errs, blame(at.key(prop), "unknown property"))
 			}
 			continue
 		}
-		errs = append(errs, Error{File: file, Path: at, Message: leaf.ErrorKind.LocalizedString(printer)})
+		errs = append(errs, blame(at, "%s", leaf.ErrorKind.LocalizedString(printer)))
 	}
 	sort.SliceStable(errs, func(i, j int) bool { return errs[i].Path < errs[j].Path })
 	return dedupe(errs), nil
-}
-
-func joinPath(parent, key string) string {
-	if parent == "" {
-		return key
-	}
-	return parent + "." + key
 }
 
 // leaves returns the most specific causes of a validation error.
@@ -110,7 +120,7 @@ func leaves(ve *jsonschema.ValidationError) []*jsonschema.ValidationError {
 
 // instancePath renders a JSON pointer as a dotted path, using the document
 // to tell list indexes from map keys.
-func instancePath(doc any, tokens []string) string {
+func instancePath(doc any, tokens []string) path {
 	var p path
 	cur := doc
 	for _, tok := range tokens {
@@ -129,7 +139,7 @@ func instancePath(doc any, tokens []string) string {
 			p = p.key(tok)
 		}
 	}
-	return p.String()
+	return p
 }
 
 func dedupe(errs Errors) Errors {

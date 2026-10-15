@@ -69,3 +69,23 @@ Design §5.2 lists "providers outside `llm.allowed_providers`" among the semanti
 ## 2026-10-16 — Profile schemas list their properties explicitly
 
 `profile` and `resolvedProfile` repeat the profile fields with `additionalProperties: false` instead of sharing them through `$ref` plus `unevaluatedProperties: false`. With the shared form, one invalid field made every sibling field "unevaluated" and produced a false "unknown property" error for each.
+
+## 2026-10-16 — Org config sources and failures
+
+`--org-config` takes a path (relative to the repo root) or an `https://` URL; any other URL scheme is a config error (exit 2). A missing file is a config error; an unreachable server, a non-200 response or a body over 1 MiB is an infrastructure failure (exit 3), because the repo's config is not at fault. Without an injected client, fetching times out after 30 seconds. There is no environment variable for the org config yet; CI passes the flag.
+
+## 2026-10-16 — The org config pin is checked only when an org config is given
+
+`org_config_sha256` in the repo config is compared against the SHA-256 of the org config's raw bytes whenever `--org-config` is used (URL or path). A pin without an org config is not an error, so developers can run `qgate validate` locally without fetching it. Only a repo config may pin, and only an org config may lock keys.
+
+## 2026-10-16 — Locked keys address the resolved config
+
+Entries in `locked` are dotted paths into the resolved config, the same namespace `qgate validate` prints and `--set` uses, and must name a field the resolved-config schema defines. A key under `profile.` locks that field of the resolved profile for every stage. A later layer may restate the locked value; only a different value is an error, reported against the repo config or `--set`. `qgate validate` lists each locked key with its value and whether the org config or the builtin defaults set it.
+
+## 2026-10-16 — Layers are validated partially, the merged config completely
+
+Each config file is checked against the schema on its own, except for required properties below the root, so a repo config can override one field of an agent or provider the org config defines. Required properties are checked on the merged config. Errors found after merging name the layer that set the offending path: the last layer containing it, matching keyed-list elements by key and appended-list elements by position.
+
+## 2026-10-16 — `validate` fetches an org config URL
+
+Design §4.1 said `validate` uses no network. With an `https://` org config, resolving the config requires fetching it, so `validate` makes exactly that request and no other (no providers, no VCS). §4.1 is updated accordingly.

@@ -11,6 +11,16 @@
       "required": ["version"],
       "properties": {
         "version": { "const": 1 },
+        "locked": {
+          "description": "Org config only: dotted paths into the resolved config that no later layer may change.",
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9_]+(\\.[a-z0-9_-]+)*$" }
+        },
+        "org_config_sha256": {
+          "description": "Repo config only: the SHA-256 the org config must have.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
         "project": { "$ref": "#/$defs/project" },
         "scoring": { "$ref": "#/$defs/scoring" },
         "llm": { "$ref": "#/$defs/llm" },

@@ -11,8 +11,10 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 )
 
 //go:embed builtin.yaml
@@ -27,82 +29,147 @@ var repoConfigNames = [...]string{".qgate.yaml", ".qgate.yml"}
 type Options struct {
 	Dir        string            // repo root; relative paths resolve against it
 	Env        map[string]string // for ${VAR} interpolation
+	OrgConfig  string            // org config path or HTTPS URL; empty for none
 	ConfigPath string            // explicit repo config (--config or QGATE_CONFIG); empty to discover
 	Stage      string
-	Sets       []string // --set overrides, "dotted.path=value"
+	Sets       []string     // --set overrides, "dotted.path=value"
+	HTTPClient *http.Client // fetches an org config URL; nil for a default client
 }
 
 // Resolved is the configuration for one run.
 type Resolved struct {
-	// RepoConfig is the repo config file used, or "" when only builtin
-	// defaults apply.
+	// RepoConfig is the repo config file used, or "" when there is none.
 	RepoConfig string
-	// Source names where the config came from in messages: the repo config
-	// relative to the repo root, or "builtin defaults".
+	// Source names the repo config in messages (relative to the repo root),
+	// or "builtin defaults" when there is no repo config.
 	Source string
+	// OrgConfig names the org config in messages, or "" when there is none.
+	OrgConfig string
+	// Locked are the keys the org config locks, with their values.
+	Locked []LockedKey
 	// Document is the resolved config as plain values, as printed by
 	// `qgate validate` and stored in the report.
 	Document map[string]any
 	Config   Config
 }
 
-// Load resolves the configuration for opts.Stage. Problems with the
-// configuration are returned as Errors; anything else is an I/O failure.
+// Load resolves the configuration for opts.Stage: builtin defaults, then the
+// org config, then the repo config, then the stage's profile, then --set.
+// Problems with the configuration are returned as Errors; anything else is
+// an infrastructure failure.
 func Load(ctx context.Context, opts Options) (*Resolved, error) {
 	sch, err := loadSchemas()
 	if err != nil {
 		return nil, err
 	}
-
 	builtin, err := parseYAML(builtinYAML)
 	if err != nil {
 		return nil, fmt.Errorf("parse builtin defaults: %w", err)
 	}
+	ls := layers{{source: builtinSource, doc: builtin}}
 
-	merged := builtin
+	var org, repo *layer
+	var orgData []byte
+	if opts.OrgConfig != "" {
+		data, source, err := readOrgConfig(ctx, opts)
+		if err != nil {
+			return nil, err
+		}
+		doc, err := parseLayer(sch, data, source, opts.Env)
+		if err != nil {
+			return nil, err
+		}
+		org, orgData = &layer{source: source, doc: doc}, data
+	}
 	repoPath, err := discover(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
-	source := builtinSource
 	if repoPath != "" {
-		source = displayPath(opts.Dir, repoPath)
-		layer, err := readLayer(ctx, sch, repoPath, source, opts.Env)
+		source := displayPath(opts.Dir, repoPath)
+		doc, err := readLayer(ctx, sch, repoPath, source, opts.Env)
 		if err != nil {
 			return nil, err
 		}
-		merged = mergeLayers(merged, layer)
+		repo = &layer{source: source, doc: doc}
 	}
 
-	profiles, _ := merged["profiles"].(map[string]any)
-	if errs := checkProfiles(profiles, source); len(errs) > 0 {
-		return nil, errs
+	errs := checkPlacement(org, repo)
+	var locked []string
+	if org != nil {
+		ls = append(ls, *org)
+		keys, lerrs := lockedKeys(sch, *org)
+		locked, errs = keys, append(errs, lerrs...)
+		if repo != nil {
+			errs = append(errs, checkPin(orgData, org.source, *repo)...)
+		}
 	}
-	// Check every profile, not only the selected one, and report paths as
-	// they are written in the config file.
-	if errs := checkSemantics(merged, source); len(errs) > 0 {
-		return nil, errs
+	if repo != nil {
+		ls = append(ls, *repo)
 	}
-	profile, errs := resolveProfile(profiles, opts.Stage, source)
 	if len(errs) > 0 {
 		return nil, errs
 	}
 
-	doc := merged
-	delete(doc, "profiles")
-	doc["stage"] = opts.Stage
-	doc["profile"] = profile
+	merged := ls.merge()
+	delete(merged, "locked")
+	delete(merged, "org_config_sha256")
+	blame := ls.attribute(merged)
+
+	// Each layer was checked on its own; required fields can only be
+	// checked once the layers are merged.
+	if errs, err := validateSchema(sch.layer, merged, complete, blame); err != nil || len(errs) > 0 {
+		return nil, firstErr(err, errs)
+	}
+
+	profiles, _ := merged["profiles"].(map[string]any)
+	if errs := checkProfiles(profiles, blame); len(errs) > 0 {
+		return nil, errs
+	}
+	// Check every profile, not only the selected one, and report paths as
+	// they are written in the layer that set them.
+	if errs := checkSemantics(merged, blame); len(errs) > 0 {
+		return nil, errs
+	}
+	profile, errs := resolveProfile(profiles, opts.Stage, blame)
+	if len(errs) > 0 {
+		return nil, errs
+	}
+	doc := resolvedDoc(merged, opts.Stage, profile)
+
+	var lockedOut []LockedKey
+	if len(locked) > 0 {
+		upToOrg := resolveLenient(ls[:2], opts.Stage)
+		builtinOnly := resolveLenient(ls[:1], opts.Stage)
+		if repo != nil {
+			if errs := checkLocked(locked, upToOrg, doc, repo.source); len(errs) > 0 {
+				return nil, errs
+			}
+		}
+		for _, key := range locked {
+			v, _ := lookup(upToOrg, key)
+			setBy := builtinSource
+			if b, _ := lookup(builtinOnly, key); !reflect.DeepEqual(b, v) {
+				setBy = org.source
+			}
+			lockedOut = append(lockedOut, LockedKey{Key: key, Value: v, SetBy: setBy})
+		}
+	}
 
 	// Only --set can make an already-checked document invalid, so the
 	// resolved document is checked again only when it was used.
 	if len(opts.Sets) > 0 {
+		before := deepCopy(doc).(map[string]any)
 		if errs := applySets(doc, opts.Sets); len(errs) > 0 {
 			return nil, errs
 		}
-		if errs, err := validateSchema(sch.resolved, doc, setSource); err != nil || len(errs) > 0 {
+		if errs, err := validateSchema(sch.resolved, doc, complete, blameSource(setSource)); err != nil || len(errs) > 0 {
 			return nil, firstErr(err, errs)
 		}
-		if errs := checkSemantics(doc, setSource); len(errs) > 0 {
+		if errs := checkSemantics(doc, blameSource(setSource)); len(errs) > 0 {
+			return nil, errs
+		}
+		if errs := checkLocked(locked, before, doc, setSource); len(errs) > 0 {
 			return nil, errs
 		}
 	}
@@ -111,7 +178,36 @@ func Load(ctx context.Context, opts Options) (*Resolved, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Resolved{RepoConfig: repoPath, Source: source, Document: doc, Config: cfg}, nil
+	res := &Resolved{RepoConfig: repoPath, Source: builtinSource, Locked: lockedOut, Document: doc, Config: cfg}
+	if repo != nil {
+		res.Source = repo.source
+	}
+	if org != nil {
+		res.OrgConfig = org.source
+	}
+	return res, nil
+}
+
+// resolvedDoc replaces a merged document's profiles with the selected stage
+// and its resolved profile.
+func resolvedDoc(merged map[string]any, stage string, profile map[string]any) map[string]any {
+	doc := deepCopy(merged).(map[string]any)
+	delete(doc, "profiles")
+	doc["stage"] = stage
+	doc["profile"] = profile
+	return doc
+}
+
+// resolveLenient resolves the config the given layers alone would produce,
+// falling back to the profile defaults when they do not define the stage.
+func resolveLenient(ls layers, stage string) map[string]any {
+	merged := ls.merge()
+	profiles, _ := merged["profiles"].(map[string]any)
+	profile, errs := resolveProfile(profiles, stage, blameSource(ls.top()))
+	if len(errs) > 0 {
+		profile = profileDefaults()
+	}
+	return resolvedDoc(merged, stage, profile)
 }
 
 // discover finds the repo config: an explicit path, else the first of
@@ -155,11 +251,16 @@ func readLayer(ctx context.Context, sch *compiledSchemas, p, source string, env 
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", source, err)
 	}
+	return parseLayer(sch, data, source, env)
+}
+
+// parseLayer parses, validates and interpolates one config layer.
+func parseLayer(sch *compiledSchemas, data []byte, source string, env map[string]string) (map[string]any, error) {
 	layer, err := parseYAML(data)
 	if err != nil {
 		return nil, Errors{errorf(source, "", "invalid YAML: %v", err)}
 	}
-	errs, err := validateSchema(sch.layer, layer, source)
+	errs, err := validateSchema(sch.layer, layer, partial, blameSource(source))
 	if err != nil {
 		return nil, err
 	}
