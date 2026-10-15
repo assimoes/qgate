@@ -1,0 +1,30 @@
+# Builtin defaults: the first config layer. Every later layer (org config,
+# repo config, profile, --set) overrides these.
+version: 1
+
+project:
+  include: ["**/*"]
+  exclude: []
+
+scoring:
+  version: 1
+  severity_weights: { critical: 40, high: 20, medium: 8, low: 2, info: 0 }
+  agent_weight_pct: 50
+  agent_min_confidence: 70
+  agent_max_penalty: 15
+  category_weights: { security: 40, quality: 30, maintainability: 20, testing: 10, dependencies: 10 }
+
+llm:
+  redact_secrets: true
+  exclude_paths: []
+  budget: { max_input_tokens_per_run: 400000, max_units_per_agent: 60 }
+
+reporting:
+  pr: { summary: true, inline: true, inline_min_severity: medium, max_inline_comments: 25 }
+
+# Profiles state only what differs from the profile defaults (advisory
+# enforcement, diff scope, no agents, warn on input and agent errors).
+profiles:
+  dev: {}
+  staging: {}
+  prod: {}

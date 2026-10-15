@@ -6,59 +6,43 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io/fs"
-	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	"qgate/internal/buildinfo"
+	"qgate/internal/config"
 	"qgate/internal/model"
 	"qgate/internal/report"
-	"qgate/internal/score"
 )
 
 // DefaultReportPath is where `qgate run` writes the JSON report when no
 // output is configured, relative to the working directory.
 const DefaultReportPath = "qgate-report.json"
 
-const defaultStage = "dev"
-
-// repoConfigNames are the repo config files looked up in the repo root, in order.
-var repoConfigNames = []string{".qgate.yaml", ".qgate.yml"}
-
-type runOptions struct {
-	stage string
-}
-
 func (a app) newRunCommand() *cobra.Command {
-	var opts runOptions
+	var flags configFlags
 	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "Run the full quality gate pipeline",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if !cmd.Flags().Changed("stage") {
-				opts.stage = envOr(a.inv.Env, "QGATE_STAGE", defaultStage)
+			started := time.Now()
+			res, err := a.load(cmd, flags)
+			if err != nil {
+				return err
 			}
-			return a.runPipeline(cmd.Context(), opts)
+			return a.runPipeline(cmd.Context(), started, res)
 		},
 	}
-	cmd.Flags().StringVar(&opts.stage, "stage", defaultStage, "stage to run; selects the profile of the same name (env QGATE_STAGE)")
+	flags.register(cmd)
 	return cmd
 }
 
-func (a app) runPipeline(ctx context.Context, opts runOptions) error {
-	started := time.Now()
-
-	found, err := a.repoConfigExists()
-	if err != nil {
-		return err
-	}
-	if !found {
+func (a app) runPipeline(ctx context.Context, started time.Time, res *config.Resolved) error {
+	if res.RepoConfig == "" {
 		a.logger.Warn("no repo config found; only builtin policy is active")
 	}
 
@@ -66,8 +50,17 @@ func (a app) runPipeline(ctx context.Context, opts runOptions) error {
 	if err != nil {
 		return err
 	}
-	resolved := json.RawMessage(`{}`)
+	// encoding/json sorts map keys, so this encoding is canonical.
+	resolved, err := json.Marshal(res.Document)
+	if err != nil {
+		return fmt.Errorf("encode resolved config: %w", err)
+	}
 	hash := sha256.Sum256(resolved)
+	cfg := res.Config
+	scoringParams, err := json.Marshal(res.Document["scoring"])
+	if err != nil {
+		return fmt.Errorf("encode scoring params: %w", err)
+	}
 
 	r := &model.Report{
 		SchemaVersion: model.ReportSchemaVersion,
@@ -75,13 +68,13 @@ func (a app) runPipeline(ctx context.Context, opts runOptions) error {
 		Run: model.Run{
 			ID:          runID,
 			StartedAt:   started.UTC(),
-			Stage:       opts.stage,
-			Enforcement: model.EnforcementAdvisory,
-			GatingScope: model.GatingScopeDiff,
+			Stage:       cfg.Stage,
+			Enforcement: cfg.Profile.Enforcement,
+			GatingScope: cfg.Profile.GatingScope,
 		},
 		ConfigHash:     hex.EncodeToString(hash[:]),
 		ResolvedConfig: resolved,
-		Scoring:        model.Scoring{Version: score.AlgorithmVersion, Params: json.RawMessage(`{}`)},
+		Scoring:        model.Scoring{Version: cfg.Scoring.Version, Params: scoringParams},
 		Inputs:         []model.InputStatus{},
 		Agents:         []model.AgentStatus{},
 		Findings:       []model.Finding{},
@@ -103,30 +96,6 @@ func (a app) runPipeline(ctx context.Context, opts runOptions) error {
 	return nil
 }
 
-// repoConfigExists reports whether a repo config is present. An explicitly
-// named config (QGATE_CONFIG) that does not exist is a config error.
-func (a app) repoConfigExists() (bool, error) {
-	if p := a.inv.Env["QGATE_CONFIG"]; p != "" {
-		if !filepath.IsAbs(p) {
-			p = filepath.Join(a.inv.Dir, p)
-		}
-		if _, err := os.Stat(p); err != nil {
-			return false, usageErrorf("repo config %s: %w", p, err)
-		}
-		return true, nil
-	}
-	for _, name := range repoConfigNames {
-		_, err := os.Stat(filepath.Join(a.inv.Dir, name))
-		switch {
-		case err == nil:
-			return true, nil
-		case !errors.Is(err, fs.ErrNotExist):
-			return false, fmt.Errorf("look up repo config: %w", err)
-		}
-	}
-	return false, nil
-}
-
 // newRunID returns a random RFC 4122 version 4 UUID.
 func newRunID() (string, error) {
 	var b [16]byte
@@ -136,11 +105,4 @@ func newRunID() (string, error) {
 	b[6] = b[6]&0x0f | 0x40
 	b[8] = b[8]&0x3f | 0x80
 	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16]), nil
-}
-
-func envOr(env map[string]string, key, fallback string) string {
-	if v := env[key]; v != "" {
-		return v
-	}
-	return fallback
 }

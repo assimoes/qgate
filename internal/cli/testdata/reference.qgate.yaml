@@ -1,0 +1,114 @@
+version: 1
+
+project:
+  name: payments-api
+  include: ["**/*"]
+  exclude: ["vendor/**", "**/testdata/**", "**/*.pb.go"]
+
+scoring:
+  version: 1
+  severity_weights: { critical: 40, high: 20, medium: 8, low: 2, info: 0 }
+  agent_weight_pct: 50
+  agent_min_confidence: 70
+  agent_max_penalty: 15
+  category_weights: { security: 40, quality: 30, maintainability: 20, testing: 10 }
+
+llm:
+  allowed_providers: [anthropic, local]
+  redact_secrets: true
+  exclude_paths: ["**/*.env", "secrets/**", "**/*.pem"]
+  budget: { max_input_tokens_per_run: 400000, max_units_per_agent: 60 }
+
+providers:
+  anthropic:
+    type: anthropic
+    api_key_env: QGATE_ANTHROPIC_API_KEY
+    max_concurrency: 4
+    request_timeout: 90s
+  local:
+    type: openai_compatible
+    base_url: ${QGATE_LOCAL_LLM_URL}
+    max_concurrency: 2
+    request_timeout: 180s
+    capabilities: { context_window: 32768, json_schema: false, tool_calls: false }
+
+inputs:
+  - { name: semgrep, format: sarif, path: reports/semgrep.sarif, category_default: security, required: true }
+  - name: golangci
+    format: checkstyle
+    path: reports/golangci.xml
+    category_default: quality
+    severity_map: { error: high, warning: medium, info: low }
+  - { name: go-coverage, format: cobertura, path: reports/coverage.xml }
+  - { name: licenses, mode: exec_plugin, command: ["qgate-plugin-licenses"], timeout: 60s }
+
+category_mappings:            # first match wins
+  - { match: { cwe: "*" }, category: security }
+  - { match: { rule_id: "golangci:gocyclo" }, category: maintainability }
+
+agents:
+  security-reviewer:
+    kind: reviewer
+    provider: anthropic
+    model: "<model-id>"
+    prompt: { base: builtin://security-reviewer@1, extend: [".qgate/prompts/auth.md"] }
+    categories: [security]
+    max_findings_per_unit: 10
+  quality-reviewer:
+    kind: reviewer
+    provider: local
+    model: "qwen2.5-coder:32b"
+    prompt: { base: builtin://quality-reviewer@1 }
+    categories: [quality, maintainability]
+  triage:
+    kind: triager
+    provider: anthropic
+    model: "<model-id>"
+    prompt: { base: builtin://triage@1 }
+    applies_to: { min_severity: medium }
+    max_findings_per_unit: 10   # input batch size for triagers
+
+review_rules:
+  - id: no-raw-sql
+    description: >
+      All database access goes through sqlc-generated functions.
+      No SQL built with string concatenation or fmt.Sprintf.
+    severity: high
+    category: security
+    paths: ["**/*.go"]
+    agents: [security-reviewer]
+
+suppressions:
+  - { rule: "golangci:lll", paths: ["internal/gen/**"], reason: Generated code, expires: 2027-01-31 }
+
+profiles:
+  base:                         # abstract
+    enforcement: advisory
+    scope: diff
+    agents: [security-reviewer, quality-reviewer, triage]
+    on_input_error: warn
+    on_agent_error: warn
+    gate: { max_new: { critical: 0 } }
+  dev:
+    extends: base
+    agents: [quality-reviewer]
+  staging:
+    extends: base
+    enforcement: blocking
+    gate:
+      overall_min: 70
+      category_min: { security: 85 }
+      max_new: { critical: 0, high: 0 }
+      require_assessed: [security]
+      metrics: [{ name: coverage.line, scope: diff, op: ">=", value: 70 }]
+  prod:
+    extends: staging
+    on_input_error: fail
+    gate: { category_min: { security: 95 } }
+
+reporting:
+  pr: { summary: true, inline: true, inline_min_severity: medium, max_inline_comments: 25 }
+  outputs:
+    - { format: json, path: qgate-report.json }
+    - { format: sarif, path: qgate.sarif }
+    - { format: markdown, path: qgate-report.md }

@@ -5,6 +5,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 
@@ -37,7 +38,9 @@ func Execute(ctx context.Context, inv Invocation) int {
 
 	err := classify(root.ExecuteContext(ctx))
 	if err != nil {
-		a.logger.Error("qgate failed", "error", err)
+		// The final error is for a human reading the CI log, so it is
+		// printed plainly rather than as a structured log record.
+		fmt.Fprintf(inv.Stderr, "qgate: %v\n", err)
 	}
 	return exitCode(err)
 }
@@ -59,6 +62,7 @@ func (a app) newRootCommand() *cobra.Command {
 	root.AddCommand(
 		a.newVersionCommand(),
 		a.newRunCommand(),
+		a.newValidateCommand(),
 	)
 	wrapRunE(root)
 	return root

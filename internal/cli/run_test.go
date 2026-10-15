@@ -145,3 +145,40 @@ func TestRunExitsThreeWhenReportCannotBeWritten(t *testing.T) {
 		t.Errorf("stderr does not explain the failure:\n%s", res.Stderr)
 	}
 }
+
+func TestRunAppliesTheResolvedProfile(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, ".qgate.yaml"),
+		[]byte("version: 1\nprofiles:\n  staging: { enforcement: blocking, scope: files }\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	res := clitest.Run(t, clitest.Options{Dir: dir}, "run", "--stage", "staging")
+	if res.Code != 0 {
+		t.Fatalf("exit code = %d, want 0; stderr:\n%s", res.Code, res.Stderr)
+	}
+	validateReport(t, res.Report)
+	run := res.DecodeReport(t)["run"].(map[string]any)
+	if run["enforcement"] != "blocking" || run["scope"] != "files" {
+		t.Errorf("run = %v, want blocking enforcement and files scope", run)
+	}
+	resolved := res.DecodeReport(t)["resolved_config"].(map[string]any)
+	if resolved["stage"] != "staging" {
+		t.Errorf("resolved_config.stage = %v, want staging", resolved["stage"])
+	}
+}
+
+func TestRunRejectsInvalidConfig(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, ".qgate.yaml"), []byte("version: 2\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	res := clitest.Run(t, clitest.Options{Dir: dir}, "run")
+	if res.Code != 2 {
+		t.Fatalf("exit code = %d, want 2; stderr:\n%s", res.Code, res.Stderr)
+	}
+	if res.Report != nil {
+		t.Error("a report was written for an invalid config")
+	}
+}

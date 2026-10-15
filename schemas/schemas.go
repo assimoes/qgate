@@ -8,3 +8,9 @@ import _ "embed"
 //
 //go:embed report.schema.json
 var Report []byte
+
+// Config is the JSON Schema for config layers ($defs/layer, the root) and
+// the resolved config ($defs/resolved).
+//
+//go:embed config.schema.json
+var Config []byte

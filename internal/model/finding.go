@@ -3,7 +3,6 @@
 package model
 
 import (
-	"encoding/json"
 	"fmt"
 )
 
@@ -41,21 +40,18 @@ func ParseSeverity(name string) (Severity, error) {
 	return 0, fmt.Errorf("unknown severity %q", name)
 }
 
-// MarshalJSON encodes the severity as its lowercase name.
-func (s Severity) MarshalJSON() ([]byte, error) {
+// MarshalText encodes the severity as its lowercase name. It also makes
+// Severity usable as a JSON object key.
+func (s Severity) MarshalText() ([]byte, error) {
 	if !s.valid() {
 		return nil, fmt.Errorf("marshal severity: invalid value %d", int(s))
 	}
-	return json.Marshal(s.String())
+	return []byte(s.String()), nil
 }
 
-// UnmarshalJSON decodes a lowercase severity name.
-func (s *Severity) UnmarshalJSON(data []byte) error {
-	var name string
-	if err := json.Unmarshal(data, &name); err != nil {
-		return fmt.Errorf("unmarshal severity: %w", err)
-	}
-	v, err := ParseSeverity(name)
+// UnmarshalText decodes a lowercase severity name.
+func (s *Severity) UnmarshalText(text []byte) error {
+	v, err := ParseSeverity(string(text))
 	if err != nil {
 		return err
 	}

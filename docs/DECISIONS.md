@@ -29,3 +29,27 @@ CI runs a pinned staticcheck with `go run honnef.co/go/tools/cmd/staticcheck@<ve
 ## 2026-10-15 — No reporter registry yet
 
 The `Reporter` interface exists, but `run` wires the JSON and console reporters directly. The registry keyed by output format arrives with `--output` and the SARIF and Markdown reporters (ticket 11), when there is more than one configurable format to select.
+
+## 2026-10-15 — Builtin profiles and profile defaults
+
+The builtin defaults define `dev`, `staging` and `prod` as empty profiles, so qgate runs at any of the usual stages with no repo config. Every resolved profile starts from fixed defaults (advisory enforcement, `diff` gating scope, no agents, `warn` on input and agent errors, no gate checks), so a profile only states what differs, even one that extends nothing. An unknown stage is a config error that lists the known profiles.
+
+## 2026-10-15 — `--set` paths address the resolved config
+
+`--set` applies to the resolved config `qgate validate` prints, where the selected profile lives under `profile`: `--set profile.gate.overall_min=80`, not `gate.overall_min`. Values are parsed as YAML. The result is validated against the resolved-config schema and semantic checks, and errors are attributed to `--set`.
+
+## 2026-10-15 — Unset interpolation variables are config errors
+
+`${VAR}` in a field marked `x-qgate-interpolate` fails with exit 2 when `VAR` is not set (set-but-empty is allowed). `${...}` in any other field is left as written, so text such as a review rule's description is never rewritten. The schema marks the fields; the interpolator walks the document alongside the schema rather than keeping a separate list.
+
+## 2026-10-15 — Semantic checks cover every profile, as written
+
+Semantic checks run on the layered config before profile resolution, so references in profiles that are not selected are still checked and errors cite the path as written (`profiles.dev.agents[1]`), not the resolved `profile.*`. They run again on the resolved config only when `--set` was used.
+
+## 2026-10-15 — Builtin category weights include dependencies
+
+The builtin `scoring.category_weights` are the reference values plus `dependencies: 10`, since `dependencies` is a builtin category. Category weight maps deep-merge, so a repo config that lists only some categories keeps the builtin weights for the rest.
+
+## 2026-10-15 — Config errors are printed plainly
+
+The final error of a run is printed to stderr as `qgate: <message>` rather than as a structured log record, because it is read by a human in a CI log. Config errors list every problem, one per line, as `<file>: <dotted.path>: <message>`.
