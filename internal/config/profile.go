@@ -26,8 +26,22 @@ func resolveProfile(profiles map[string]any, stage string, blame blame) (map[str
 			stage, strings.Join(sortedKeys(profiles), ", "))}
 	}
 
-	// Walk from the selected profile to the root of its chain.
-	var chain []map[string]any
+	names, errs := profileChain(profiles, stage, blame)
+	if len(errs) > 0 {
+		return nil, errs
+	}
+	resolved := profileDefaults()
+	for _, name := range slices.Backward(names) {
+		p := deepCopy(profiles[name]).(map[string]any)
+		delete(p, "extends")
+		resolved = deepMerge(resolved, p).(map[string]any)
+	}
+	return resolved, nil
+}
+
+// profileChain returns the names from stage's profile to the root of its
+// extends chain.
+func profileChain(profiles map[string]any, stage string, blame blame) ([]string, Errors) {
 	var names []string
 	for name := stage; name != ""; {
 		if slices.Contains(names, name) {
@@ -40,17 +54,9 @@ func resolveProfile(profiles map[string]any, stage string, blame blame) (map[str
 				"extends unknown profile %q", name)}
 		}
 		names = append(names, name)
-		chain = append(chain, p)
 		name, _ = p["extends"].(string)
 	}
-
-	resolved := profileDefaults()
-	for _, p := range slices.Backward(chain) {
-		p = deepCopy(p).(map[string]any)
-		delete(p, "extends")
-		resolved = deepMerge(resolved, p).(map[string]any)
-	}
-	return resolved, nil
+	return names, nil
 }
 
 // checkProfiles reports every profile whose extends chain is broken, not

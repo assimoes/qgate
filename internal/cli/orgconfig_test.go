@@ -132,7 +132,7 @@ func TestOrgConfigFromHTTPS(t *testing.T) {
 
 	t.Run("unpinned", func(t *testing.T) {
 		t.Parallel()
-		_, doc := validateStage(t, clitest.Options{HTTPClient: client}, "--org-config", url)
+		_, doc := validateStage(t, clitest.Options{HTTP: client}, "--org-config", url)
 		if got := dig(t, doc, "scoring", "agent_max_penalty"); got != 10 {
 			t.Errorf("scoring.agent_max_penalty = %v, want 10 from the org config", got)
 		}
@@ -141,13 +141,13 @@ func TestOrgConfigFromHTTPS(t *testing.T) {
 		t.Parallel()
 		dir := t.TempDir()
 		writeRepoConfig(t, dir, ".qgate.yaml", "version: 1\norg_config_sha256: "+sha256Hex(orgConfig)+"\n")
-		validateStage(t, clitest.Options{Dir: dir, HTTPClient: client}, "--org-config", url)
+		validateStage(t, clitest.Options{Dir: dir, HTTP: client}, "--org-config", url)
 	})
 	t.Run("pinned and mismatched", func(t *testing.T) {
 		t.Parallel()
 		dir := t.TempDir()
 		writeRepoConfig(t, dir, ".qgate.yaml", "version: 1\norg_config_sha256: "+sha256Hex("something else")+"\n")
-		res := clitest.Run(t, clitest.Options{Dir: dir, HTTPClient: client}, "validate", "--org-config", url)
+		res := clitest.Run(t, clitest.Options{Dir: dir, HTTP: client}, "validate", "--org-config", url)
 		if res.Code != 2 || !strings.Contains(res.Stderr, "org_config_sha256") || !strings.Contains(res.Stderr, sha256Hex(orgConfig)) {
 			t.Errorf("exit code = %d, want 2 naming the pin and the actual digest; stderr:\n%s", res.Code, res.Stderr)
 		}
@@ -171,7 +171,7 @@ func TestOrgConfigSourceErrors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			res := clitest.Run(t, clitest.Options{HTTPClient: tt.client}, append([]string{"validate"}, tt.args...)...)
+			res := clitest.Run(t, clitest.Options{HTTP: tt.client}, append([]string{"validate"}, tt.args...)...)
 			if res.Code != tt.code || !strings.Contains(res.Stderr, tt.want) {
 				t.Errorf("exit code = %d, want %d with %q; stderr:\n%s", res.Code, tt.code, tt.want, res.Stderr)
 			}
@@ -216,7 +216,20 @@ func TestLockedKeys(t *testing.T) {
 			repo:  "version: 1\nprofiles:\n  prod: { enforcement: advisory }\n",
 			args:  []string{"--stage", "prod"},
 			code:  2,
-			wants: []string{".qgate.yaml: profile.enforcement: locked by the org config", `"blocking"`}},
+			wants: []string{".qgate.yaml: profiles.prod.enforcement: locked by the org config", `"blocking"`}},
+		{name: "violation in a profile that is not selected is still caught",
+			repo:  "version: 1\nprofiles:\n  prod: { enforcement: advisory }\n",
+			args:  []string{"--stage", "dev"},
+			code:  2,
+			wants: []string{".qgate.yaml: profiles.prod.enforcement: locked by the org config"}},
+		{name: "repo profile extending an org profile inherits the locked value",
+			repo: "version: 1\nprofiles:\n  ci: { extends: prod, gate: { overall_min: 60 } }\n",
+			args: []string{"--stage", "ci"},
+			code: 0},
+		{name: "repo profile that sets a locked profile field anywhere",
+			repo:  "version: 1\nprofiles:\n  nightly: { enforcement: blocking }\n",
+			code:  2,
+			wants: []string{".qgate.yaml: profiles.nightly.enforcement: locked by the org config"}},
 		{name: "--set changes a locked key",
 			repo:  "version: 1\n",
 			args:  []string{"--set", "llm.allowed_providers=[anthropic]"},
@@ -314,4 +327,25 @@ func TestErrorsNameTheLayerThatCausedThem(t *testing.T) {
 			t.Errorf("exit code = %d, stderr:\n%s", res.Code, res.Stderr)
 		}
 	})
+}
+
+func TestOrgConfigURLCredentialsAreNeverShown(t *testing.T) {
+	t.Parallel()
+	url, client := orgServer(t, http.StatusOK, orgConfig)
+	secretURL := strings.Replace(url, "https://", "https://bot:s3cret@", 1) + "?token=t0ken"
+	dir := t.TempDir()
+	writeRepoConfig(t, dir, ".qgate.yaml", "version: 1\norg_config_sha256: "+sha256Hex("other")+"\n")
+
+	res := clitest.Run(t, clitest.Options{Dir: dir, HTTP: client}, "validate", "--org-config", secretURL)
+	if res.Code != 2 {
+		t.Fatalf("exit code = %d, want 2 (pin mismatch); stderr:\n%s", res.Code, res.Stderr)
+	}
+	for _, secret := range []string{"s3cret", "t0ken"} {
+		if strings.Contains(res.Stderr+res.Stdout, secret) {
+			t.Errorf("output reveals %q:\n%s", secret, res.Stderr)
+		}
+	}
+	if !strings.Contains(res.Stderr, "/qgate/org.yaml") {
+		t.Errorf("output does not identify the org config:\n%s", res.Stderr)
+	}
 }

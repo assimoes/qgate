@@ -80,7 +80,7 @@ Design §5.2 lists "providers outside `llm.allowed_providers`" among the semanti
 
 ## 2026-10-16 — Locked keys address the resolved config
 
-Entries in `locked` are dotted paths into the resolved config, the same namespace `qgate validate` prints and `--set` uses, and must name a field the resolved-config schema defines. A key under `profile.` locks that field of the resolved profile for every stage. A later layer may restate the locked value; only a different value is an error, reported against the repo config or `--set`. `qgate validate` lists each locked key with its value and whether the org config or the builtin defaults set it.
+Entries in `locked` are dotted paths into the resolved config, the same namespace `qgate validate` prints and `--set` uses, and must name a field the resolved-config schema defines. A key under `profile.` locks that field in every profile. The repo config violates a lock when removing the locked fields from it would change the result: the merged value for a top-level key, or that field of any profile, selected or not, for a profile key. Restating the locked value, or inheriting it through `extends`, is therefore allowed, and a violation in a profile that is not selected is still caught. Errors name the repo profile to fix (`profiles.prod.enforcement`). `--set` violates a lock when it changes the resolved value. `qgate validate` lists each locked key with its value and whether the org config or the builtin defaults set it.
 
 ## 2026-10-16 — Layers are validated partially, the merged config completely
 
@@ -89,3 +89,11 @@ Each config file is checked against the schema on its own, except for required p
 ## 2026-10-16 — `validate` fetches an org config URL
 
 Design §4.1 said `validate` uses no network. With an `https://` org config, resolving the config requires fetching it, so `validate` makes exactly that request and no other (no providers, no VCS). §4.1 is updated accordingly.
+
+## 2026-10-16 — Org config URLs are redacted in output
+
+An org config URL may carry credentials in its user info or query string. Everywhere qgate names it (errors, the `validate` header, locked-key listings) it shows the URL without user info, query or fragment, and HTTP client errors are unwrapped so the full URL is never repeated. The `validate` header names both layers: "from .qgate.yaml over org config <url>".
+
+## 2026-10-16 — The HTTP client is chosen at the composition root
+
+`config` depends on a one-method `HTTPDoer` interface. The CLI supplies an `*http.Client` with a 30-second timeout unless the invocation provides its own (tests inject a TLS test server's client).

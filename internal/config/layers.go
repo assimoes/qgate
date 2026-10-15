@@ -53,12 +53,15 @@ func (ls layers) sets(i int, merged map[string]any, p path) bool {
 				return false
 			}
 			elem := ml[idx]
-			switch {
-			case depth == 1 && keyedLists[parent] != "":
-				key := keyedLists[parent]
+			rule, key := replaceList, ""
+			if depth == 1 { // only top-level lists have special rules
+				rule, key = listRuleFor(parent)
+			}
+			switch rule {
+			case keyedList:
 				m, _ := elem.(map[string]any)
 				own = findByKey(ol, key, m[key])
-			case depth == 1 && appendedLists[parent]:
+			case appendedList:
 				offset := 0
 				for _, earlier := range ls[:i] {
 					l, _ := earlier.doc[parent].([]any)
@@ -109,9 +112,9 @@ func findByKey(list []any, key string, want any) any {
 	return nil
 }
 
-// attribute returns an Error for p in the merged document, naming the layer
+// blame returns an Error for p in the merged document, naming the layer
 // that set it.
-func (ls layers) attribute(merged map[string]any) blame {
+func (ls layers) blame(merged map[string]any) blame {
 	return func(p path, format string, args ...any) Error {
 		return errorf(ls.origin(merged, p), p.String(), format, args...)
 	}

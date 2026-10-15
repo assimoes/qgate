@@ -9,19 +9,20 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
-const (
-	// maxOrgConfigBytes bounds what qgate reads from an org config URL.
-	maxOrgConfigBytes = 1 << 20
-	// orgConfigTimeout bounds fetching an org config when the caller did not
-	// supply its own HTTP client.
-	orgConfigTimeout = 30 * time.Second
-)
+// maxOrgConfigBytes bounds what qgate reads from an org config URL.
+const maxOrgConfigBytes = 1 << 20
+
+// HTTPDoer sends HTTP requests. *http.Client satisfies it; the caller
+// chooses timeouts and transport.
+type HTTPDoer interface {
+	Do(*http.Request) (*http.Response, error)
+}
 
 // readOrgConfig returns the org config's bytes and how to name it in
 // messages. A URL must use HTTPS. Failing to reach a server is an
@@ -30,10 +31,12 @@ func readOrgConfig(ctx context.Context, opts Options) ([]byte, string, error) {
 	ref := opts.OrgConfig
 	switch {
 	case strings.HasPrefix(ref, "https://"):
-		data, err := fetch(ctx, opts.HTTPClient, ref)
-		return data, ref, err
+		source := redactURL(ref)
+		data, err := fetch(ctx, opts.HTTP, ref, source)
+		return data, source, err
 	case strings.Contains(ref, "://"):
-		return nil, ref, Errors{errorf(ref, "", "org config URL must use HTTPS")}
+		source := redactURL(ref)
+		return nil, source, Errors{errorf(source, "", "org config URL must use HTTPS")}
 	}
 
 	p := ref
@@ -54,30 +57,48 @@ func readOrgConfig(ctx context.Context, opts Options) ([]byte, string, error) {
 	return data, source, nil
 }
 
-func fetch(ctx context.Context, client *http.Client, url string) ([]byte, error) {
+// fetch GETs rawURL. Messages name it only by source, its redacted form,
+// because the URL may carry credentials.
+func fetch(ctx context.Context, client HTTPDoer, rawURL, source string) ([]byte, error) {
 	if client == nil {
-		client = &http.Client{Timeout: orgConfigTimeout}
+		return nil, fmt.Errorf("fetch org config %s: no HTTP client configured", source)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("fetch org config %s: %w", url, err)
+		return nil, fmt.Errorf("fetch org config %s: invalid URL", source)
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("fetch org config %s: %w", url, err)
+		// *url.Error repeats the full URL; keep only the cause.
+		var ue *url.Error
+		if errors.As(err, &ue) {
+			err = ue.Err
+		}
+		return nil, fmt.Errorf("fetch org config %s: %w", source, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("fetch org config %s: %s", url, resp.Status)
+		return nil, fmt.Errorf("fetch org config %s: %s", source, resp.Status)
 	}
 	data, err := io.ReadAll(io.LimitReader(resp.Body, maxOrgConfigBytes+1))
 	if err != nil {
-		return nil, fmt.Errorf("fetch org config %s: %w", url, err)
+		return nil, fmt.Errorf("fetch org config %s: %w", source, err)
 	}
 	if len(data) > maxOrgConfigBytes {
-		return nil, fmt.Errorf("fetch org config %s: larger than %d bytes", url, maxOrgConfigBytes)
+		return nil, fmt.Errorf("fetch org config %s: larger than %d bytes", source, maxOrgConfigBytes)
 	}
 	return data, nil
+}
+
+// redactURL drops user info, query and fragment, which may carry
+// credentials, so a URL can appear in messages and reports.
+func redactURL(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "<invalid org config URL>"
+	}
+	u.User, u.RawQuery, u.Fragment, u.ForceQuery = nil, "", "", false
+	return u.String()
 }
 
 // checkPin verifies the org config against the repo config's

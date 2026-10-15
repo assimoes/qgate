@@ -41,7 +41,7 @@ func (a app) load(cmd *cobra.Command, f configFlags) (*config.Resolved, error) {
 		Dir:        a.inv.Dir,
 		Env:        a.inv.Env,
 		OrgConfig:  f.orgConfig,
-		HTTPClient: a.inv.HTTP,
+		HTTP:       a.inv.HTTP,
 		ConfigPath: configPath,
 		Stage:      stage,
 		Sets:       f.sets,

@@ -30,8 +30,8 @@ type Result struct {
 type Options struct {
 	Dir string
 	Env map[string]string
-	// HTTPClient serves outbound HTTP (org config URLs); nil uses the default.
-	HTTPClient *http.Client
+	// HTTP serves outbound HTTP (org config URLs); nil uses the default.
+	HTTP *http.Client
 }
 
 // Run invokes the CLI with args and returns what it produced.
@@ -48,7 +48,7 @@ func Run(t *testing.T, opts Options, args ...string) Result {
 		Dir:    dir,
 		Stdout: &stdout,
 		Stderr: &stderr,
-		HTTP:   opts.HTTPClient,
+		HTTP:   opts.HTTP,
 	})
 	res := Result{Code: code, Stdout: stdout.String(), Stderr: stderr.String()}
 	data, err := os.ReadFile(filepath.Join(dir, cli.DefaultReportPath))

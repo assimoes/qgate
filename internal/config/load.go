@@ -11,10 +11,8 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"net/http"
 	"os"
 	"path/filepath"
-	"reflect"
 )
 
 //go:embed builtin.yaml
@@ -32,8 +30,8 @@ type Options struct {
 	OrgConfig  string            // org config path or HTTPS URL; empty for none
 	ConfigPath string            // explicit repo config (--config or QGATE_CONFIG); empty to discover
 	Stage      string
-	Sets       []string     // --set overrides, "dotted.path=value"
-	HTTPClient *http.Client // fetches an org config URL; nil for a default client
+	Sets       []string // --set overrides, "dotted.path=value"
+	HTTP       HTTPDoer // fetches an org config URL
 }
 
 // Resolved is the configuration for one run.
@@ -114,7 +112,7 @@ func Load(ctx context.Context, opts Options) (*Resolved, error) {
 	merged := ls.merge()
 	delete(merged, "locked")
 	delete(merged, "org_config_sha256")
-	blame := ls.attribute(merged)
+	blame := ls.blame(merged)
 
 	// Each layer was checked on its own; required fields can only be
 	// checked once the layers are merged.
@@ -139,21 +137,12 @@ func Load(ctx context.Context, opts Options) (*Resolved, error) {
 
 	var lockedOut []LockedKey
 	if len(locked) > 0 {
-		upToOrg := resolveLenient(ls[:2], opts.Stage)
-		builtinOnly := resolveLenient(ls[:1], opts.Stage)
 		if repo != nil {
-			if errs := checkLocked(locked, upToOrg, doc, repo.source); len(errs) > 0 {
+			if errs := checkRepoLocks(locked, ls, *repo); len(errs) > 0 {
 				return nil, errs
 			}
 		}
-		for _, key := range locked {
-			v, _ := lookup(upToOrg, key)
-			setBy := builtinSource
-			if b, _ := lookup(builtinOnly, key); !reflect.DeepEqual(b, v) {
-				setBy = org.source
-			}
-			lockedOut = append(lockedOut, LockedKey{Key: key, Value: v, SetBy: setBy})
-		}
+		lockedOut = describeLocked(locked, doc, *org)
 	}
 
 	// Only --set can make an already-checked document invalid, so the
@@ -169,7 +158,7 @@ func Load(ctx context.Context, opts Options) (*Resolved, error) {
 		if errs := checkSemantics(doc, blameSource(setSource)); len(errs) > 0 {
 			return nil, errs
 		}
-		if errs := checkLocked(locked, before, doc, setSource); len(errs) > 0 {
+		if errs := checkSetLocks(locked, before, doc); len(errs) > 0 {
 			return nil, errs
 		}
 	}
@@ -196,18 +185,6 @@ func resolvedDoc(merged map[string]any, stage string, profile map[string]any) ma
 	doc["stage"] = stage
 	doc["profile"] = profile
 	return doc
-}
-
-// resolveLenient resolves the config the given layers alone would produce,
-// falling back to the profile defaults when they do not define the stage.
-func resolveLenient(ls layers, stage string) map[string]any {
-	merged := ls.merge()
-	profiles, _ := merged["profiles"].(map[string]any)
-	profile, errs := resolveProfile(profiles, stage, blameSource(ls.top()))
-	if len(errs) > 0 {
-		profile = profileDefaults()
-	}
-	return resolvedDoc(merged, stage, profile)
 }
 
 // discover finds the repo config: an explicit path, else the first of

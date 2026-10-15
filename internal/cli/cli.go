@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -25,6 +26,10 @@ type Invocation struct {
 	HTTP *http.Client
 }
 
+// defaultHTTPTimeout bounds each outbound request when the invocation did
+// not supply its own client.
+const defaultHTTPTimeout = 30 * time.Second
+
 // app carries what every command needs.
 type app struct {
 	inv    Invocation
@@ -33,6 +38,9 @@ type app struct {
 
 // Execute runs qgate with inv and returns the process exit code.
 func Execute(ctx context.Context, inv Invocation) int {
+	if inv.HTTP == nil {
+		inv.HTTP = &http.Client{Timeout: defaultHTTPTimeout}
+	}
 	a := app{inv: inv, logger: slog.New(slog.NewTextHandler(inv.Stderr, nil))}
 	root := a.newRootCommand()
 	root.SetArgs(inv.Args)
