@@ -22,10 +22,6 @@ import (
 	"qgate/internal/model"
 )
 
-// defaultCategory applies when neither a category mapping nor the input's
-// category_default does.
-const defaultCategory model.Category = "quality"
-
 // ChangeSet says how the change under review touched a file.
 type ChangeSet interface {
 	File(path string) (gitctx.ChangedFile, bool)
@@ -146,7 +142,7 @@ func mapSeverities(fs []ingest.Finding, severityMap map[string]model.Severity) [
 func assignCategories(fs []ingest.Finding, categoryDefault model.Category) {
 	cat := categoryDefault
 	if cat == "" {
-		cat = defaultCategory
+		cat = model.DefaultCategory
 	}
 	for i := range fs {
 		fs[i].Category = cat

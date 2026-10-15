@@ -87,6 +87,7 @@ func (a app) newRootCommand() *cobra.Command {
 		a.newVersionCommand(),
 		a.newRunCommand(),
 		a.newValidateCommand(),
+		a.newScoreCommand(),
 	)
 	wrapRunE(root)
 	return root

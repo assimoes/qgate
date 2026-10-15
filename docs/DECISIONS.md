@@ -131,3 +131,15 @@ CLAUDE.md requires concurrent code to be tested for goroutines outliving their t
 - When a result carries full `fingerprints`, qgate uses them in preference to `partialFingerprints`: SARIF defines full fingerprints as the stable identity, partial ones as inputs for computing it. Either way the keys are combined in sorted order.
 - Only results of kind `fail` (the SARIF default) are findings. `pass`, `notApplicable`, `informational`, `review` and `open` results are skipped and counted in a warning on the input.
 - `artifactLocation.uri` is a URI: it is percent-decoded, and a `uriBaseId` is resolved through the run's `originalUriBaseIds` (following chains). A base of the filesystem root (`file:///`, as Trivy writes for some scans) adds nothing and leaves the URI relative. Absolute results are made repo-relative against the repo root, as git and as the caller spell it (they differ through symlinks), and the CI workspace; anything outside them is dropped.
+
+## 2026-10-16 — Which categories are assessed
+
+A successful input assesses its `category_default` (or `quality`, where its findings go without one), every category in its `assesses`, and the category of every finding it produced. A failed input assesses nothing. Design §12.4 names only the declared categories; counting the categories of real findings keeps a category with new findings from being reported as not assessed.
+
+## 2026-10-16 — `score --report` compares, then decides
+
+`qgate score --report` decodes the stored findings, input statuses and resolved config, recomputes scores and the gate through the same function `run` uses, and compares both sections byte for byte (after removing whitespace) with the stored ones. A mismatch is exit 3 and shows both versions. Run health is a fact of the original run, so the stored `gate.degraded` is an input to the recomputation, not an output it checks. On a match, the exit code mirrors the gate as `run` would (1 for a failed blocking gate), so CI can re-gate from an artifact.
+
+## 2026-10-16 — Gate check names and values
+
+Gate checks are named `overall_min`, `category_min.<category>`, `max_new.<severity>`, `max_new_tool.<severity>` and `require_assessed.<category>`, listed in that order, with categories sorted and severities from critical down. `expected` reads `>= 70`, `<= 0` or `assessed`; `actual` is the score in whole (floored) points, a count, or a boolean, and `null` for a category that was not assessed. Score comparisons use hundredths, so 69.99 fails `>= 70` and shows as 69.

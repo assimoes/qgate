@@ -256,11 +256,20 @@ func decode(doc map[string]any) (Config, error) {
 	if err != nil {
 		return Config{}, fmt.Errorf("encode resolved config: %w", err)
 	}
+	cfg, err := DecodeResolved(data)
+	if err != nil {
+		return Config{}, fmt.Errorf("schema and types disagree: %w", err)
+	}
+	return cfg, nil
+}
+
+// DecodeResolved decodes a resolved config as stored in a report.
+func DecodeResolved(data []byte) (Config, error) {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
 	var cfg Config
 	if err := dec.Decode(&cfg); err != nil {
-		return Config{}, fmt.Errorf("decode resolved config (schema and types disagree): %w", err)
+		return Config{}, fmt.Errorf("decode resolved config: %w", err)
 	}
 	return cfg, nil
 }

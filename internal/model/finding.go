@@ -63,6 +63,11 @@ func (s *Severity) UnmarshalText(text []byte) error {
 // builtins are security, quality, maintainability, testing and dependencies.
 type Category string
 
+// DefaultCategory is where a tool finding goes when neither a category
+// mapping nor its input's category_default places it, and what an input
+// with no category_default assesses.
+const DefaultCategory Category = "quality"
+
 // Location is where a finding is, on the new side of the change.
 type Location struct {
 	Path      string `json:"path"`       // repo-relative, forward slashes

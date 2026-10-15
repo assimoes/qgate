@@ -122,13 +122,23 @@ type GateResult struct {
 	Checks   []GateCheck `json:"checks"`
 }
 
+// CheckResult is how one gate check came out.
+type CheckResult string
+
+// Gate check results.
+const (
+	CheckPass    CheckResult = "pass"
+	CheckFail    CheckResult = "fail"
+	CheckSkipped CheckResult = "skipped" // could not apply, e.g. category not assessed
+)
+
 // GateCheck is the result of one gate check.
 type GateCheck struct {
-	Check    string `json:"check"`
-	Expected string `json:"expected"`
-	Actual   any    `json:"actual"`
-	Result   string `json:"result"` // pass | fail | skipped
-	Note     string `json:"note,omitempty"`
+	Check    string      `json:"check"`
+	Expected string      `json:"expected"`
+	Actual   any         `json:"actual"` // a number, count or boolean; null when unknown
+	Result   CheckResult `json:"result"`
+	Note     string      `json:"note,omitempty"`
 }
 
 // Egress lists the files sent to one provider.

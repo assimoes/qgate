@@ -93,6 +93,10 @@ func (a app) runPipeline(ctx context.Context, started time.Time, res *config.Res
 		return fmt.Errorf("encode resolved config: %w", err)
 	}
 	hash := sha256.Sum256(resolved)
+	decision, err := pipeline.Decide(inputs.Findings, cfg, inputs.Statuses, pipeline.Degraded(inputs.Statuses))
+	if err != nil {
+		return err
+	}
 	scoringParams, err := json.Marshal(res.Document["scoring"])
 	if err != nil {
 		return fmt.Errorf("encode scoring params: %w", err)
@@ -115,8 +119,8 @@ func (a app) runPipeline(ctx context.Context, started time.Time, res *config.Res
 		Agents:         []model.AgentStatus{},
 		Findings:       inputs.Findings,
 		Metrics:        inputs.Metrics,
-		Scores:         model.Scores{Categories: map[string]*int{}},
-		Gate:           model.GateResult{Outcome: model.OutcomePass, Checks: []model.GateCheck{}},
+		Scores:         decision.Scores,
+		Gate:           decision.Gate,
 		DataEgress:     []model.Egress{},
 	}
 	if gc != nil {
@@ -131,6 +135,15 @@ func (a app) runPipeline(ctx context.Context, started time.Time, res *config.Res
 	// Any other reporter failing never changes the outcome.
 	if err := (report.Console{W: a.inv.Stdout}).Report(ctx, r); err != nil {
 		a.logger.Warn("console reporter failed", "error", err)
+	}
+	return gateError(r.Run.Enforcement, r.Gate.Outcome)
+}
+
+// gateError turns a failed gate into exit code 1. Only a fail outcome
+// under blocking enforcement does; advisory runs never fail the job.
+func gateError(e model.Enforcement, o model.Outcome) error {
+	if e == model.EnforcementBlocking && o == model.OutcomeFail {
+		return errGateFailed
 	}
 	return nil
 }
