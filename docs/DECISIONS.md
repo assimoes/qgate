@@ -147,3 +147,15 @@ Gate checks are named `overall_min`, `category_min.<category>`, `max_new.<severi
 ## 2026-10-16 — Category weights
 
 At least one `scoring.category_weights` entry must be positive (exit 2 otherwise). A category with weight 0 is still scored and shown but does not contribute to the overall score; when every assessed category weighs 0 there is no overall score, and the `overall_min` gate check says so in its note rather than implying nothing was assessed. The weighting that forms the overall score belongs to the scoring algorithm version, like the category scores.
+
+## 2026-10-16 — Checkstyle ingestion
+
+A `<error>`'s `source` attribute is its rule ID (`errcheck` for golangci-lint, `eslint.rules.no-console` for ESLint) and also its title, since Checkstyle has no separate title. Errors without a source, such as ESLint parse errors, get rule ID `unnamed` and a warning. The builtin severity mapping is `error`→high, `warning`→medium, `info`→low, `ignore`→info; an input's `severity_map` applies first. A missing or invalid `line` means file-level. As with SARIF, the Seam C fixtures are hand-written in golangci-lint's and ESLint's output shapes because the linters are not installed; replace them with captured output and run `go test ./internal/ingest/checkstyle -update`.
+
+## 2026-10-16 — Category mappings match namespaced rule IDs
+
+A category mapping matches when every criterion it sets matches: `rule_id` against the namespaced rule ID (`golangci:gocyclo`), `path` against the repo-relative path, and `cwe` against any of the finding's CWEs (`"*"` matches any finding that has one). Patterns use doublestar globs. The first matching mapping wins; otherwise the input's `category_default`, else `quality`.
+
+## 2026-10-16 — What tool dedup merges
+
+Design §9 step 9 merges findings from different inputs with identical fingerprints or identical `(path, start_line, CWE set)`. Fingerprints include the namespaced rule ID (step 5), and input names are unique, so fingerprints from different inputs never collide; the fingerprint criterion is implemented but in practice the location criterion does the merging. The location criterion requires a non-empty CWE set: without it, any two findings from different tools on the same line would merge. Merging is transitive across inputs (union-find), never within a single input. The survivor is the highest severity, then the alphabetically first input name, then canonical order; it keeps its own fingerprint, rule ID and text, and the others become its `merged_sources`, sorted by input and rule ID. All findings are then put in one canonical order (path, line, rule, column, input, fingerprint, message), so the report does not depend on the order of inputs.

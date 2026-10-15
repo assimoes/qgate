@@ -29,7 +29,7 @@ type InputDeps struct {
 
 // InputsResult is every input's findings, metrics and status.
 type InputsResult struct {
-	Findings []model.Finding // per input in config order, each in canonical order
+	Findings []model.Finding // deduplicated, in canonical order
 	Metrics  []model.Metric
 	Statuses []model.InputStatus // in config order
 }
@@ -61,7 +61,8 @@ func RunInputs(ctx context.Context, deps InputDeps, cfg config.Config, gc *gitct
 		return InputsResult{}, err
 	}
 
-	res := InputsResult{Findings: []model.Finding{}, Metrics: []model.Metric{}}
+	res := InputsResult{Metrics: []model.Metric{}}
+	var all []model.Finding
 	for i, in := range cfg.Inputs {
 		out := outcomes[i]
 		st := model.InputStatus{
@@ -73,10 +74,11 @@ func RunInputs(ctx context.Context, deps InputDeps, cfg config.Config, gc *gitct
 			msg := err.Error()
 			st.Status, st.Error = model.InputFailed, &msg
 		}
-		res.Findings = append(res.Findings, out.findings...)
+		all = append(all, out.findings...)
 		res.Metrics = append(res.Metrics, out.metrics...)
 		res.Statuses = append(res.Statuses, st)
 	}
+	res.Findings = normalize.DedupTools(all)
 	return res, nil
 }
 
@@ -111,12 +113,13 @@ func runInput(ctx context.Context, deps InputDeps, cfg config.Config, gc *gitctx
 		return inputOutcome{}, fmt.Errorf("parse %s: %w", in.Path, err)
 	}
 	findings, warnings, err := normalize.ToolFindings(ctx, raw.Findings, normalize.Options{
-		Input:       in,
-		Project:     cfg.Project,
-		GatingScope: cfg.Profile.GatingScope,
-		Changes:     gc,
-		Lines:       gc,
-		Workspaces:  deps.Workspaces,
+		Input:            in,
+		CategoryMappings: cfg.CategoryMappings,
+		Project:          cfg.Project,
+		GatingScope:      cfg.Profile.GatingScope,
+		Changes:          gc,
+		Lines:            gc,
+		Workspaces:       deps.Workspaces,
 	})
 	if err != nil {
 		return inputOutcome{}, err

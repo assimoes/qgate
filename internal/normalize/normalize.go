@@ -4,6 +4,7 @@
 package normalize
 
 import (
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -12,9 +13,10 @@ import (
 	"net/url"
 	"path"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/bmatcuk/doublestar/v4"
 
 	"qgate/internal/config"
 	"qgate/internal/gitctx"
@@ -35,11 +37,12 @@ type LineSource interface {
 
 // Options are what normalizing one input's findings needs.
 type Options struct {
-	Input       config.Input
-	Project     config.Project
-	GatingScope model.GatingScope
-	Changes     ChangeSet
-	Lines       LineSource
+	Input            config.Input
+	CategoryMappings []config.CategoryMapping
+	Project          config.Project
+	GatingScope      model.GatingScope
+	Changes          ChangeSet
+	Lines            LineSource
 	// Workspaces are absolute directories analyzers may have prefixed
 	// paths with: the repo root and the CI workspace.
 	Workspaces []string
@@ -53,11 +56,11 @@ func ToolFindings(ctx context.Context, in []ingest.Finding, opts Options) ([]mod
 	kept := normalizePaths(in, opts)
 	namespaceRules(kept, opts.Input.Name)
 	warnings = append(warnings, mapSeverities(kept, opts.Input.SeverityMap)...)
-	assignCategories(kept, opts.Input.EffectiveCategory())
+	assignCategories(kept, opts.CategoryMappings, opts.Input.EffectiveCategory())
 
 	// Canonical order first, so occurrence indexes in fingerprints are
 	// deterministic.
-	sort.SliceStable(kept, func(i, j int) bool { return canonicalLess(kept[i].Finding, kept[j].Finding) })
+	slices.SortStableFunc(kept, func(a, b ingest.Finding) int { return compareCanonical(a.Finding, b.Finding) })
 	if err := fingerprint(ctx, kept, opts.Lines); err != nil {
 		return nil, nil, err
 	}
@@ -67,7 +70,7 @@ func ToolFindings(ctx context.Context, in []ingest.Finding, opts Options) ([]mod
 		out[i] = kept[i].Finding
 	}
 	classifyScope(out, opts.GatingScope, opts.Changes)
-	sort.SliceStable(out, func(i, j int) bool { return canonicalLess(out[i], out[j]) })
+	slices.SortStableFunc(out, compareCanonical)
 	return out, warnings, nil
 }
 
@@ -137,12 +140,41 @@ func mapSeverities(fs []ingest.Finding, severityMap map[string]model.Severity) [
 	return warnings
 }
 
-// assignCategories sets each finding's category (step 4). Category
-// mappings arrive with ticket 07.
-func assignCategories(fs []ingest.Finding, cat model.Category) {
+// assignCategories sets each finding's category (step 4): the first
+// category mapping that matches, else the input's effective category.
+func assignCategories(fs []ingest.Finding, mappings []config.CategoryMapping, fallback model.Category) {
 	for i := range fs {
-		fs[i].Category = cat
+		fs[i].Category = fallback
+		for _, m := range mappings {
+			if matches(m.Match, fs[i].Finding) {
+				fs[i].Category = m.Category
+				break
+			}
+		}
 	}
+}
+
+// matches reports whether a finding satisfies every criterion a mapping
+// sets. Rule IDs are matched after namespacing; cwe matches any of the
+// finding's CWEs, and "*" any finding that has one.
+func matches(m config.CategoryMatch, f model.Finding) bool {
+	if m.RuleID != "" && !glob(m.RuleID, f.RuleID) {
+		return false
+	}
+	if m.Path != "" && !glob(m.Path, f.Location.Path) {
+		return false
+	}
+	if m.CWE != "" {
+		return slices.ContainsFunc(f.CWE, func(c string) bool { return glob(m.CWE, c) })
+	}
+	return true
+}
+
+// glob matches with doublestar semantics; patterns were validated when the
+// config was loaded.
+func glob(pattern, s string) bool {
+	ok, _ := doublestar.Match(pattern, s)
+	return ok
 }
 
 // fingerprint gives each finding a stable identity that survives lines
@@ -226,23 +258,17 @@ func inScope(loc model.Location, scope model.GatingScope, changes ChangeSet) boo
 	return false
 }
 
-// canonicalLess orders findings by path, line, rule and then fingerprint,
-// so output never depends on input order.
-func canonicalLess(a, b model.Finding) bool {
-	switch {
-	case a.Location.Path != b.Location.Path:
-		return a.Location.Path < b.Location.Path
-	case a.Location.StartLine != b.Location.StartLine:
-		return a.Location.StartLine < b.Location.StartLine
-	case a.Location.EndLine != b.Location.EndLine:
-		return a.Location.EndLine < b.Location.EndLine
-	case a.RuleID != b.RuleID:
-		return a.RuleID < b.RuleID
-	case a.Location.StartCol != b.Location.StartCol:
-		return a.Location.StartCol < b.Location.StartCol
-	case a.Message != b.Message:
-		return a.Message < b.Message
-	default:
-		return a.Fingerprint < b.Fingerprint
-	}
+// compareCanonical totally orders findings by path, line, rule, column,
+// input, fingerprint and message, so output never depends on input order.
+func compareCanonical(a, b model.Finding) int {
+	return cmp.Or(
+		cmp.Compare(a.Location.Path, b.Location.Path),
+		cmp.Compare(a.Location.StartLine, b.Location.StartLine),
+		cmp.Compare(a.Location.EndLine, b.Location.EndLine),
+		cmp.Compare(a.RuleID, b.RuleID),
+		cmp.Compare(a.Location.StartCol, b.Location.StartCol),
+		cmp.Compare(a.Source.Name, b.Source.Name),
+		cmp.Compare(a.Fingerprint, b.Fingerprint),
+		cmp.Compare(a.Message, b.Message),
+	)
 }

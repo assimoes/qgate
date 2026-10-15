@@ -1,0 +1,71 @@
+{
+  "findings": [
+    {
+      "fingerprint": "",
+      "rule_id": "eslint.rules.no-unused-vars",
+      "category": "",
+      "severity": "info",
+      "title": "eslint.rules.no-unused-vars",
+      "message": "'unused' is assigned a value but never used. (no-unused-vars)",
+      "location": {
+        "path": "/home/runner/work/web/web/src/app.js",
+        "start_line": 3,
+        "end_line": 3,
+        "start_col": 7
+      },
+      "source": {
+        "kind": "tool",
+        "name": ""
+      },
+      "status": "",
+      "raw_severity": "warning",
+      "default_severity": "medium"
+    },
+    {
+      "fingerprint": "",
+      "rule_id": "eslint.rules.no-console",
+      "category": "",
+      "severity": "info",
+      "title": "eslint.rules.no-console",
+      "message": "Unexpected console statement. (no-console)",
+      "location": {
+        "path": "/home/runner/work/web/web/src/app.js",
+        "start_line": 10,
+        "end_line": 10,
+        "start_col": 1
+      },
+      "source": {
+        "kind": "tool",
+        "name": ""
+      },
+      "status": "",
+      "raw_severity": "error",
+      "default_severity": "high"
+    },
+    {
+      "fingerprint": "",
+      "rule_id": "unnamed",
+      "category": "",
+      "severity": "info",
+      "title": "unnamed",
+      "message": "Parsing error: Unexpected token )",
+      "location": {
+        "path": "/home/runner/work/web/web/src/broken.js",
+        "start_line": 1,
+        "end_line": 1,
+        "start_col": 9
+      },
+      "source": {
+        "kind": "tool",
+        "name": ""
+      },
+      "status": "",
+      "raw_severity": "error",
+      "default_severity": "high"
+    }
+  ],
+  "metrics": null,
+  "warnings": [
+    "rule ID \"unnamed\" given to errors without a source attribute: 1"
+  ]
+}

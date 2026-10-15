@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"qgate/internal/ingest"
+	"qgate/internal/ingest/checkstyle"
 	"qgate/internal/ingest/sarif"
 )
 
@@ -43,7 +44,7 @@ type app struct {
 
 // builtinIngestors are the analyzer report formats this build reads.
 func builtinIngestors() *ingest.Registry {
-	return ingest.NewRegistry(sarif.New())
+	return ingest.NewRegistry(sarif.New(), checkstyle.New())
 }
 
 // Execute runs qgate with inv and returns the process exit code.

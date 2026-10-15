@@ -1,0 +1,69 @@
+{
+  "findings": [
+    {
+      "fingerprint": "",
+      "rule_id": "errcheck",
+      "category": "",
+      "severity": "info",
+      "title": "errcheck",
+      "message": "Error return value of `tx.Rollback` is not checked",
+      "location": {
+        "path": "internal/pay/charge.go",
+        "start_line": 48,
+        "end_line": 48,
+        "start_col": 12
+      },
+      "source": {
+        "kind": "tool",
+        "name": ""
+      },
+      "status": "",
+      "raw_severity": "error",
+      "default_severity": "high"
+    },
+    {
+      "fingerprint": "",
+      "rule_id": "gocyclo",
+      "category": "",
+      "severity": "info",
+      "title": "gocyclo",
+      "message": "cyclomatic complexity 34 of func `(*Service).Charge` is high (\u003e 30)",
+      "location": {
+        "path": "internal/pay/charge.go",
+        "start_line": 52,
+        "end_line": 52,
+        "start_col": 1
+      },
+      "source": {
+        "kind": "tool",
+        "name": ""
+      },
+      "status": "",
+      "raw_severity": "error",
+      "default_severity": "high"
+    },
+    {
+      "fingerprint": "",
+      "rule_id": "ineffassign",
+      "category": "",
+      "severity": "info",
+      "title": "ineffassign",
+      "message": "ineffectual assignment to err",
+      "location": {
+        "path": "internal/pay/refund.go",
+        "start_line": 17,
+        "end_line": 17,
+        "start_col": 2
+      },
+      "source": {
+        "kind": "tool",
+        "name": ""
+      },
+      "status": "",
+      "raw_severity": "warning",
+      "default_severity": "medium"
+    }
+  ],
+  "metrics": null,
+  "warnings": null
+}
