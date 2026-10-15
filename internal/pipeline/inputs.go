@@ -20,12 +20,6 @@ import (
 // maxParallelInputs bounds how many inputs are read and parsed at once.
 const maxParallelInputs = 4
 
-// Input statuses in the report.
-const (
-	InputOK     = "ok"
-	InputFailed = "failed"
-)
-
 // InputDeps are what running inputs needs from the outside world.
 type InputDeps struct {
 	Registry   *ingest.Registry
@@ -40,49 +34,26 @@ type InputsResult struct {
 	Statuses []model.InputStatus // in config order
 }
 
-// Failed reports whether any input failed.
-func (r InputsResult) Failed() bool {
-	for _, s := range r.Statuses {
-		if s.Status == InputFailed {
-			return true
-		}
-	}
-	return false
-}
-
 // RunInputs reads and normalizes every configured input concurrently. A
 // failing input is recorded in its status and never stops the others; only
 // cancellation of ctx aborts the step.
 func RunInputs(ctx context.Context, deps InputDeps, cfg config.Config, gc *gitctx.Context) (InputsResult, error) {
-	type slot struct {
-		findings []model.Finding
-		metrics  []model.Metric
-		status   model.InputStatus
-	}
-	slots := make([]slot, len(cfg.Inputs))
+	outcomes := make([]inputOutcome, len(cfg.Inputs))
+	failures := make([]error, len(cfg.Inputs))
 
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(maxParallelInputs)
 	for i, in := range cfg.Inputs {
 		g.Go(func() error {
-			findings, metrics, warnings, err := runInput(gctx, deps, cfg, gc, in)
-			st := model.InputStatus{
-				Name:     in.Name,
-				Format:   in.Format,
-				Status:   InputOK,
-				Findings: len(findings),
-				Metrics:  len(metrics),
-				Warnings: append([]string{}, warnings...),
-			}
+			out, err := runInput(gctx, deps, cfg, gc, in)
 			if err != nil {
 				if ctxErr := gctx.Err(); ctxErr != nil {
 					return ctxErr
 				}
-				msg := err.Error()
-				st.Status, st.Error = InputFailed, &msg
-				findings, metrics = nil, nil
+				failures[i] = err
+				return nil
 			}
-			slots[i] = slot{findings: findings, metrics: metrics, status: st}
+			outcomes[i] = out
 			return nil
 		})
 	}
@@ -90,23 +61,39 @@ func RunInputs(ctx context.Context, deps InputDeps, cfg config.Config, gc *gitct
 		return InputsResult{}, err
 	}
 
-	var res InputsResult
-	for _, s := range slots {
-		res.Findings = append(res.Findings, s.findings...)
-		res.Metrics = append(res.Metrics, s.metrics...)
-		res.Statuses = append(res.Statuses, s.status)
+	res := InputsResult{Findings: []model.Finding{}, Metrics: []model.Metric{}}
+	for i, in := range cfg.Inputs {
+		out := outcomes[i]
+		st := model.InputStatus{
+			Name: in.Name, Format: in.Format, Status: model.InputOK,
+			Findings: len(out.findings), Metrics: len(out.metrics),
+			Warnings: append([]string{}, out.warnings...),
+		}
+		if err := failures[i]; err != nil {
+			msg := err.Error()
+			st.Status, st.Error = model.InputFailed, &msg
+		}
+		res.Findings = append(res.Findings, out.findings...)
+		res.Metrics = append(res.Metrics, out.metrics...)
+		res.Statuses = append(res.Statuses, st)
 	}
 	return res, nil
 }
 
-func runInput(ctx context.Context, deps InputDeps, cfg config.Config, gc *gitctx.Context, in config.Input) (
-	[]model.Finding, []model.Metric, []string, error) {
+// inputOutcome is what one input produced.
+type inputOutcome struct {
+	findings []model.Finding
+	metrics  []model.Metric
+	warnings []string
+}
+
+func runInput(ctx context.Context, deps InputDeps, cfg config.Config, gc *gitctx.Context, in config.Input) (inputOutcome, error) {
 	if in.Mode != "" && in.Mode != "import" {
-		return nil, nil, nil, fmt.Errorf("input mode %q is not supported in this version", in.Mode)
+		return inputOutcome{}, fmt.Errorf("input mode %q is not supported in this version", in.Mode)
 	}
 	ing, ok := deps.Registry.Lookup(in.Format)
 	if !ok {
-		return nil, nil, nil, fmt.Errorf("format %q is not supported in this version", in.Format)
+		return inputOutcome{}, fmt.Errorf("format %q is not supported in this version", in.Format)
 	}
 
 	p := in.Path
@@ -115,15 +102,15 @@ func runInput(ctx context.Context, deps InputDeps, cfg config.Config, gc *gitctx
 	}
 	f, err := os.Open(p)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("open %s: %w", in.Path, err)
+		return inputOutcome{}, fmt.Errorf("open %s: %w", in.Path, err)
 	}
 	defer f.Close()
 
 	raw, err := ing.Parse(ctx, f, in, gc)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("parse %s: %w", in.Path, err)
+		return inputOutcome{}, fmt.Errorf("parse %s: %w", in.Path, err)
 	}
-	findings, warnings, err := normalize.Tool(ctx, raw.Findings, normalize.Options{
+	findings, warnings, err := normalize.ToolFindings(ctx, raw.Findings, normalize.Options{
 		Input:       in,
 		Project:     cfg.Project,
 		GatingScope: cfg.Profile.GatingScope,
@@ -132,10 +119,10 @@ func runInput(ctx context.Context, deps InputDeps, cfg config.Config, gc *gitctx
 		Workspaces:  deps.Workspaces,
 	})
 	if err != nil {
-		return nil, nil, nil, err
+		return inputOutcome{}, err
 	}
 	for i := range findings {
 		findings[i].Source.Name = in.Name
 	}
-	return findings, raw.Metrics, append(raw.Warnings, warnings...), nil
+	return inputOutcome{findings: findings, metrics: raw.Metrics, warnings: append(raw.Warnings, warnings...)}, nil
 }

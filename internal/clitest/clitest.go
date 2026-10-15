@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"qgate/internal/cli"
+	"qgate/internal/ingest"
 )
 
 // Result is what one CLI invocation produced.
@@ -32,6 +33,10 @@ type Options struct {
 	Env map[string]string
 	// HTTP serves outbound HTTP (org config URLs); nil uses the default.
 	HTTP *http.Client
+	// Context is the run's context; nil uses context.Background().
+	Context context.Context
+	// Ingestors replaces the builtin report formats; nil uses them.
+	Ingestors *ingest.Registry
 }
 
 // Run invokes the CLI with args and returns what it produced.
@@ -41,14 +46,19 @@ func Run(t *testing.T, opts Options, args ...string) Result {
 	if dir == "" {
 		dir = t.TempDir()
 	}
+	ctx := opts.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	var stdout, stderr bytes.Buffer
-	code := cli.Execute(context.Background(), cli.Invocation{
-		Args:   args,
-		Env:    opts.Env,
-		Dir:    dir,
-		Stdout: &stdout,
-		Stderr: &stderr,
-		HTTP:   opts.HTTP,
+	code := cli.Execute(ctx, cli.Invocation{
+		Args:      args,
+		Env:       opts.Env,
+		Dir:       dir,
+		Stdout:    &stdout,
+		Stderr:    &stderr,
+		HTTP:      opts.HTTP,
+		Ingestors: opts.Ingestors,
 	})
 	res := Result{Code: code, Stdout: stdout.String(), Stderr: stderr.String()}
 	data, err := os.ReadFile(filepath.Join(dir, cli.DefaultReportPath))

@@ -8,8 +8,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"net/url"
 	"path"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -24,6 +26,11 @@ import (
 // category_default does.
 const defaultCategory model.Category = "quality"
 
+// ChangeSet says how the change under review touched a file.
+type ChangeSet interface {
+	File(path string) (gitctx.ChangedFile, bool)
+}
+
 // LineSource reads a file's lines at the head commit; nil lines mean the
 // file is not there.
 type LineSource interface {
@@ -35,17 +42,17 @@ type Options struct {
 	Input       config.Input
 	Project     config.Project
 	GatingScope model.GatingScope
-	Changes     *gitctx.Context
+	Changes     ChangeSet
 	Lines       LineSource
 	// Workspaces are absolute directories analyzers may have prefixed
 	// paths with: the repo root and the CI workspace.
 	Workspaces []string
 }
 
-// Tool normalizes one input's findings: paths, rule namespacing, severity,
+// ToolFindings normalizes one input's findings: paths, rule namespacing, severity,
 // category, fingerprint and gating scope (design §9 steps 1–6). It returns
 // the findings in canonical order, plus warnings for the report.
-func Tool(ctx context.Context, in []ingest.Finding, opts Options) ([]model.Finding, []string, error) {
+func ToolFindings(ctx context.Context, in []ingest.Finding, opts Options) ([]model.Finding, []string, error) {
 	var warnings []string
 	kept := normalizePaths(in, opts)
 	namespaceRules(kept, opts.Input.Name)
@@ -126,11 +133,7 @@ func mapSeverities(fs []ingest.Finding, severityMap map[string]model.Severity) [
 		f.Severity = model.SeverityMedium
 		unmapped[f.RawSeverity] = true
 	}
-	labels := make([]string, 0, len(unmapped))
-	for l := range unmapped {
-		labels = append(labels, l)
-	}
-	sort.Strings(labels)
+	labels := slices.Sorted(maps.Keys(unmapped))
 	warnings := make([]string, len(labels))
 	for i, l := range labels {
 		warnings[i] = fmt.Sprintf("unmapped severity %q treated as medium; map it with severity_map", l)
@@ -201,7 +204,7 @@ func hash(parts ...string) string {
 }
 
 // classifyScope marks each finding new or out_of_scope (step 6).
-func classifyScope(fs []model.Finding, scope model.GatingScope, changes *gitctx.Context) {
+func classifyScope(fs []model.Finding, scope model.GatingScope, changes ChangeSet) {
 	for i := range fs {
 		if inScope(fs[i].Location, scope, changes) {
 			fs[i].Status = model.StatusNew
@@ -211,7 +214,7 @@ func classifyScope(fs []model.Finding, scope model.GatingScope, changes *gitctx.
 	}
 }
 
-func inScope(loc model.Location, scope model.GatingScope, changes *gitctx.Context) bool {
+func inScope(loc model.Location, scope model.GatingScope, changes ChangeSet) bool {
 	if scope == model.GatingScopeRepo {
 		return true
 	}

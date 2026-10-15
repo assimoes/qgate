@@ -60,7 +60,7 @@ func (a app) runPipeline(ctx context.Context, started time.Time, res *config.Res
 
 	// Git context is needed only when something produces findings.
 	var gc *gitctx.Context
-	inputs := pipeline.InputsResult{Findings: []model.Finding{}, Statuses: []model.InputStatus{}}
+	inputs := pipeline.InputsResult{Findings: []model.Finding{}, Metrics: []model.Metric{}, Statuses: []model.InputStatus{}}
 	if len(cfg.Inputs) > 0 {
 		var err error
 		gc, err = gitctx.Resolve(ctx, gitctx.Options{
@@ -74,9 +74,9 @@ func (a app) runPipeline(ctx context.Context, started time.Time, res *config.Res
 			return err
 		}
 		inputs, err = pipeline.RunInputs(ctx, pipeline.InputDeps{
-			Registry:   a.ingestors,
+			Registry:   a.inv.Ingestors,
 			Dir:        a.inv.Dir,
-			Workspaces: a.workspaces(gc),
+			Workspaces: gc.Workspaces,
 		}, cfg, gc)
 		if err != nil {
 			return err
@@ -114,7 +114,7 @@ func (a app) runPipeline(ctx context.Context, started time.Time, res *config.Res
 		Inputs:         inputs.Statuses,
 		Agents:         []model.AgentStatus{},
 		Findings:       inputs.Findings,
-		Metrics:        nonNil(inputs.Metrics),
+		Metrics:        inputs.Metrics,
 		Scores:         model.Scores{Categories: map[string]*int{}},
 		Gate:           model.GateResult{Outcome: model.OutcomePass, Checks: []model.GateCheck{}},
 		DataEgress:     []model.Egress{},
@@ -133,25 +133,6 @@ func (a app) runPipeline(ctx context.Context, started time.Time, res *config.Res
 		a.logger.Warn("console reporter failed", "error", err)
 	}
 	return nil
-}
-
-// workspaces are absolute prefixes analyzers may have written into paths:
-// the repo root and the CI workspace.
-func (a app) workspaces(gc *gitctx.Context) []string {
-	ws := []string{gc.RepoRoot}
-	for _, k := range []string{"GITHUB_WORKSPACE", "CI_PROJECT_DIR"} {
-		if v := a.inv.Env[k]; v != "" {
-			ws = append(ws, v)
-		}
-	}
-	return ws
-}
-
-func nonNil[T any](s []T) []T {
-	if s == nil {
-		return []T{}
-	}
-	return s
 }
 
 // newRunID returns a random RFC 4122 version 4 UUID.

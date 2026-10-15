@@ -6,7 +6,8 @@ package ingest
 import (
 	"context"
 	"io"
-	"sort"
+	"maps"
+	"slices"
 
 	"qgate/internal/config"
 	"qgate/internal/gitctx"
@@ -64,12 +65,7 @@ func (r *Registry) Lookup(format string) (Ingestor, bool) {
 
 // Formats lists the registered formats.
 func (r *Registry) Formats() []string {
-	out := make([]string, 0, len(r.byFormat))
-	for f := range r.byFormat {
-		out = append(out, f)
-	}
-	sort.Strings(out)
-	return out
+	return slices.Sorted(maps.Keys(r.byFormat))
 }
 
 // SeverityPtr returns a pointer to s, for DefaultSeverity.

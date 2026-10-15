@@ -82,15 +82,24 @@ type Scoring struct {
 	Params  json.RawMessage `json:"params"`
 }
 
+// InputState says whether an input produced its results.
+type InputState string
+
+// Input states.
+const (
+	InputOK     InputState = "ok"
+	InputFailed InputState = "failed"
+)
+
 // InputStatus summarizes one input's run.
 type InputStatus struct {
-	Name     string   `json:"name"`
-	Format   string   `json:"format"`
-	Status   string   `json:"status"`
-	Findings int      `json:"findings"`
-	Metrics  int      `json:"metrics"`
-	Warnings []string `json:"warnings"`
-	Error    *string  `json:"error"`
+	Name     string     `json:"name"`
+	Format   string     `json:"format"`
+	Status   InputState `json:"status"`
+	Findings int        `json:"findings"`
+	Metrics  int        `json:"metrics"`
+	Warnings []string   `json:"warnings"`
+	Error    *string    `json:"error"`
 }
 
 // AgentStatus summarizes one agent's run.

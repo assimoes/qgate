@@ -27,6 +27,8 @@ type Invocation struct {
 	Stderr io.Writer
 	// HTTP makes qgate's outbound HTTP requests; nil uses a default client.
 	HTTP *http.Client
+	// Ingestors are the report formats qgate reads; nil uses the builtin ones.
+	Ingestors *ingest.Registry
 }
 
 // defaultHTTPTimeout bounds each outbound request when the invocation did
@@ -35,9 +37,8 @@ const defaultHTTPTimeout = 30 * time.Second
 
 // app carries what every command needs.
 type app struct {
-	inv       Invocation
-	logger    *slog.Logger
-	ingestors *ingest.Registry
+	inv    Invocation
+	logger *slog.Logger
 }
 
 // builtinIngestors are the analyzer report formats this build reads.
@@ -50,7 +51,10 @@ func Execute(ctx context.Context, inv Invocation) int {
 	if inv.HTTP == nil {
 		inv.HTTP = &http.Client{Timeout: defaultHTTPTimeout}
 	}
-	a := app{inv: inv, logger: slog.New(slog.NewTextHandler(inv.Stderr, nil)), ingestors: builtinIngestors()}
+	if inv.Ingestors == nil {
+		inv.Ingestors = builtinIngestors()
+	}
+	a := app{inv: inv, logger: slog.New(slog.NewTextHandler(inv.Stderr, nil))}
 	root := a.newRootCommand()
 	root.SetArgs(inv.Args)
 	root.SetOut(inv.Stdout)

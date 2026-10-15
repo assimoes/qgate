@@ -1,14 +1,20 @@
 package cli_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"maps"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"qgate/internal/clitest"
+	"qgate/internal/config"
+	"qgate/internal/gitctx"
+	"qgate/internal/ingest"
 )
 
 // sarifResult is one result in a hand-built SARIF log.
@@ -20,6 +26,7 @@ type sarifResult struct {
 	secSev    string
 	partialFP string
 	cwe       string
+	kind      string // "" omits it (SARIF default "fail")
 }
 
 // sarifLog builds a SARIF 2.1.0 log with one run per tool name.
@@ -53,6 +60,9 @@ func sarifLog(runs map[string][]sarifResult) string {
 			}
 			if r.level != "" {
 				res["level"] = r.level
+			}
+			if r.kind != "" {
+				res["kind"] = r.kind
 			}
 			if r.partialFP != "" {
 				res["partialFingerprints"] = map[string]any{"primaryLocationLineHash": r.partialFP}
@@ -390,5 +400,149 @@ func TestMissingImportFileFailsTheInput(t *testing.T) {
 	in := res.DecodeReport(t)["inputs"].([]any)[0].(map[string]any)
 	if in["status"] != "failed" || !strings.Contains(fmt.Sprint(in["error"]), "semgrep.sarif") {
 		t.Errorf("input = %v, want failed naming the missing file", in)
+	}
+}
+
+func TestSARIFResultsThatAreNotDefectsAreSkipped(t *testing.T) {
+	t.Parallel()
+	repo, base, _ := history(t)
+	repo.Write(".qgate.yaml", semgrepInput)
+	repo.Write("reports/semgrep.sarif", sarifLog(map[string][]sarifResult{"Semgrep": {
+		{rule: "defect", level: "error", path: "a.go", line: 5},
+		{rule: "explicit-fail", kind: "fail", path: "a.go", line: 5},
+		{rule: "passed", kind: "pass", path: "a.go", line: 5},
+		{rule: "not-applicable", kind: "notApplicable", path: "a.go", line: 5},
+		{rule: "info-only", kind: "informational", path: "a.go", line: 5},
+	}}))
+	res := clitest.Run(t, clitest.Options{Dir: repo.Dir}, "run", "--base", base)
+	found := findingsByRule(t, res)
+	if len(found) != 2 || found["semgrep:defect"] == nil || found["semgrep:explicit-fail"] == nil {
+		t.Errorf("findings = %v, want only the two defects", keys(found))
+	}
+	in := res.DecodeReport(t)["inputs"].([]any)[0].(map[string]any)
+	if !strings.Contains(fmt.Sprint(in["warnings"]), "3 results") {
+		t.Errorf("warnings = %v, want a count of skipped non-defect results", in["warnings"])
+	}
+}
+
+func keys(m map[string]map[string]any) []string {
+	return slices.Sorted(maps.Keys(m))
+}
+
+func TestSARIFLocationsAreURIs(t *testing.T) {
+	t.Parallel()
+	repo := clitest.NewRepo(t)
+	repo.Write(".qgate.yaml", semgrepInput)
+	repo.Write("my file.go", "a\n")
+	repo.Write("sub/x.go", "b\n")
+	base := repo.Commit("one")
+	log := `{"version": "2.1.0", "runs": [{
+	  "tool": {"driver": {"name": "T", "rules": [{"id": "r"}]}},
+	  "originalUriBaseIds": {"SRC": {"uri": "file://` + repo.Dir + `/sub/"}},
+	  "results": [
+	    {"ruleId": "r", "message": {"text": "encoded"}, "locations": [{"physicalLocation": {
+	      "artifactLocation": {"uri": "my%20file.go"}, "region": {"startLine": 1}}}]},
+	    {"ruleId": "r", "message": {"text": "base id"}, "locations": [{"physicalLocation": {
+	      "artifactLocation": {"uri": "x.go", "uriBaseId": "SRC"}, "region": {"startLine": 1}}}]}
+	  ]}]}`
+	repo.Write("reports/semgrep.sarif", log)
+
+	res := clitest.Run(t, clitest.Options{Dir: repo.Dir}, "run", "--base", base, "--set", "profile.scope=repo")
+	if res.Code != 0 {
+		t.Fatalf("exit code = %d; stderr:\n%s", res.Code, res.Stderr)
+	}
+	paths := map[string]bool{}
+	for _, f := range res.DecodeReport(t)["findings"].([]any) {
+		paths[f.(map[string]any)["location"].(map[string]any)["path"].(string)] = true
+	}
+	if !paths["my file.go"] || !paths["sub/x.go"] {
+		t.Errorf("paths = %v, want \"my file.go\" (percent-decoded) and \"sub/x.go\" (uriBaseId resolved)", paths)
+	}
+}
+
+func TestRunOutsideAGitRepositoryIsAUsageError(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writeRepoConfig(t, dir, ".qgate.yaml", semgrepInput)
+	res := clitest.Run(t, clitest.Options{Dir: dir}, "run", "--base", "HEAD")
+	if res.Code != 2 || !strings.Contains(res.Stderr, "not inside a git repository") {
+		t.Errorf("exit code = %d, want 2; stderr:\n%s", res.Code, res.Stderr)
+	}
+}
+
+func TestOneFailingInputDoesNotStopTheOthers(t *testing.T) {
+	t.Parallel()
+	repo, base, _ := history(t)
+	repo.Write(".qgate.yaml", `version: 1
+inputs:
+  - { name: missing, format: sarif, path: nope.sarif }
+  - { name: semgrep, format: sarif, path: reports/semgrep.sarif }
+`)
+	repo.Write("reports/semgrep.sarif", sarifLog(map[string][]sarifResult{"Semgrep": scopeResults[:1]}))
+	res := clitest.Run(t, clitest.Options{Dir: repo.Dir}, "run", "--base", base)
+	found := findingsByRule(t, res)
+	if found["semgrep:changed-line"] == nil {
+		t.Errorf("the healthy input's findings are missing: %v", keys(found))
+	}
+}
+
+// blockingIngestor parses nothing until its context is cancelled, to test
+// that cancellation reaches inputs in flight.
+type blockingIngestor struct{ started chan struct{} }
+
+func (blockingIngestor) Format() string { return "sarif" }
+
+func (b blockingIngestor) Parse(ctx context.Context, _ io.Reader, _ config.Input, _ *gitctx.Context) (ingest.Result, error) {
+	b.started <- struct{}{}
+	<-ctx.Done()
+	return ingest.Result{}, ctx.Err()
+}
+
+func TestCancellationStopsInputsInFlight(t *testing.T) {
+	t.Parallel()
+	repo, base, _ := history(t)
+	var cfg strings.Builder
+	cfg.WriteString("version: 1\ninputs:\n")
+	for i := range 6 { // more than run in parallel at once
+		fmt.Fprintf(&cfg, "  - { name: in%d, format: sarif, path: reports/semgrep.sarif }\n", i)
+	}
+	repo.Write(".qgate.yaml", cfg.String())
+	repo.Write("reports/semgrep.sarif", sarifLog(map[string][]sarifResult{"Semgrep": scopeResults[:1]}))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	started := make(chan struct{}, 6)
+	go func() {
+		<-started // an input is in flight
+		cancel()
+	}()
+
+	done := make(chan clitest.Result, 1)
+	go func() {
+		done <- clitest.Run(t, clitest.Options{
+			Dir:       repo.Dir,
+			Context:   ctx,
+			Ingestors: ingest.NewRegistry(blockingIngestor{started: started}),
+		}, "run", "--base", base)
+	}()
+	select {
+	case res := <-done:
+		if res.Code != 3 || !strings.Contains(res.Stderr, "context canceled") {
+			t.Errorf("exit code = %d, want 3 (cancelled run); stderr:\n%s", res.Code, res.Stderr)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("run did not stop after cancellation")
+	}
+}
+
+func TestCancelledRunIsNotMistakenForAMissingRepository(t *testing.T) {
+	t.Parallel()
+	repo, base, _ := history(t)
+	repo.Write(".qgate.yaml", semgrepInput)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	res := clitest.Run(t, clitest.Options{Dir: repo.Dir, Context: ctx}, "run", "--base", base)
+	if res.Code != 3 || strings.Contains(res.Stderr, "not inside a git repository") {
+		t.Errorf("exit code = %d, want 3 for cancellation; stderr:\n%s", res.Code, res.Stderr)
 	}
 }

@@ -117,3 +117,17 @@ A pure rename (100% similarity) is a changed file with no added lines: under `di
 ## 2026-10-16 — Inputs run four at a time; a missing file fails only that input
 
 Inputs are read and normalized in parallel, at most four at once, each into its own result slot, then reported in config order. A missing import file, an unsupported format or mode, or a parse error marks that input `failed` with the reason and the run continues; what a failed input does to the outcome and exit code (required inputs, `on_input_error`) arrives with ticket 09. Category mappings arrive with ticket 07; until then a finding's category is the input's `category_default`, else `quality`.
+
+## 2026-10-16 — `go.uber.org/goleak` for goroutine-leak checks
+
+CLAUDE.md requires concurrent code to be tested for goroutines outliving their tests. `goleak` (test-only) does this; `internal/cli` verifies the whole package in `TestMain`, after every test, including parallel ones, has finished.
+
+## 2026-10-16 — Go 1.26 is the minimum version
+
+`golang.org/x/sync` v0.24.0 requires Go 1.26, so `go mod tidy` raised the `go` directive from 1.25.0 to 1.26.0. Design §3.2 asks for the latest stable Go, which 1.26 is; CI installs the version `go.mod` declares.
+
+## 2026-10-16 — SARIF fingerprints, kinds and locations
+
+- When a result carries full `fingerprints`, qgate uses them in preference to `partialFingerprints`: SARIF defines full fingerprints as the stable identity, partial ones as inputs for computing it. Either way the keys are combined in sorted order.
+- Only results of kind `fail` (the SARIF default) are findings. `pass`, `notApplicable`, `informational`, `review` and `open` results are skipped and counted in a warning on the input.
+- `artifactLocation.uri` is a URI: it is percent-decoded, and a `uriBaseId` is resolved through the run's `originalUriBaseIds` (following chains). A base of the filesystem root (`file:///`, as Trivy writes for some scans) adds nothing and leaves the URI relative. Absolute results are made repo-relative against the repo root, as git and as the caller spell it (they differ through symlinks), and the CI workspace; anything outside them is dropped.

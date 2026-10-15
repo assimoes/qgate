@@ -6,11 +6,15 @@
 
 **Status:** ready-for-agent
 
-- [ ] A Seam A fixture-repo helper creates commits programmatically covering added, modified, renamed and deleted files
-- [ ] `--base`/`--head` work; without them the merge-base fallback is used
-- [ ] SARIF 2.1.0 with multiple runs is ingested; `level` and `security-severity` map to severity per the design doc; CWE is extracted; `partialFingerprints` are used when present
-- [ ] Rule IDs are namespaced `<input-name>:<rule>`; unmapped severities become `medium` with a warning
-- [ ] `project.include`/`exclude` are applied; binary files have no ranges
-- [ ] Under `diff`, findings on unchanged lines are `out_of_scope`; file-level findings are `new` only if the file changed; `files` and `repo` behave as specified
-- [ ] Fingerprints are unchanged when lines are inserted above a finding
+- [x] A Seam A fixture-repo helper creates commits programmatically covering added, modified, renamed and deleted files
+- [x] `--base`/`--head` work; without them the merge-base fallback is used
+- [x] SARIF 2.1.0 with multiple runs is ingested; `level` and `security-severity` map to severity per the design doc; CWE is extracted; `partialFingerprints` are used when present
+- [x] Rule IDs are namespaced `<input-name>:<rule>`; unmapped severities become `medium` with a warning
+- [x] `project.include`/`exclude` are applied; binary files have no ranges
+- [x] Under `diff`, findings on unchanged lines are `out_of_scope`; file-level findings are `new` only if the file changed; `files` and `repo` behave as specified
+- [x] Fingerprints are unchanged when lines are inserted above a finding
 - [ ] Seam C golden tests (with `-update`) cover real Semgrep, CodeQL and Trivy SARIF output
+
+## Open
+
+- The Seam C goldens run against hand-written fixtures in each analyzer's SARIF shape, not captured output (Semgrep, CodeQL and Trivy were not installed). Replace `internal/ingest/sarif/testdata/{semgrep,codeql,trivy}.sarif` with real output and run `go test ./internal/ingest/sarif -update`, then tick the last box.

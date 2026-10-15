@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -53,6 +55,10 @@ type Context struct {
 	BaseSHA  string
 	HeadSHA  string
 	Files    []ChangedFile // sorted by path
+	// Workspaces are absolute directories analyzers may have prefixed
+	// paths with: the repo root as git and as the caller spell it (they
+	// differ through symlinks) and the CI workspace.
+	Workspaces []string
 
 	git   git
 	index map[string]int
@@ -72,8 +78,12 @@ type Options struct {
 func Resolve(ctx context.Context, opts Options) (*Context, error) {
 	g := git{dir: opts.Dir, env: gitEnv(opts.Env)}
 	root, err := g.run(ctx, "rev-parse", "--show-toplevel")
-	if err != nil {
+	var ge *gitError
+	switch {
+	case errors.As(err, &ge) && strings.Contains(ge.stderr, "not a git repository"):
 		return nil, ErrNotARepository
+	case err != nil:
+		return nil, fmt.Errorf("find repository root: %w", err)
 	}
 	g.dir = root
 
@@ -111,7 +121,8 @@ func Resolve(ctx context.Context, opts Options) (*Context, error) {
 		return nil, err
 	}
 
-	c := &Context{RepoRoot: root, BaseSHA: baseSHA, HeadSHA: headSHA, git: g, index: map[string]int{}}
+	c := &Context{RepoRoot: root, BaseSHA: baseSHA, HeadSHA: headSHA, git: g, index: map[string]int{},
+		Workspaces: workspaces(root, opts.Dir, opts.Env)}
 	for _, f := range files {
 		if Selected(f.Path, opts.Include, opts.Exclude) {
 			c.index[f.Path] = len(c.Files)
@@ -131,17 +142,40 @@ func (c *Context) File(path string) (ChangedFile, bool) {
 }
 
 // FileLines returns a file's lines at the head commit, or nil when the file
-// does not exist there.
+// does not exist there. Any other git failure is an error.
 func (c *Context) FileLines(ctx context.Context, path string) ([]string, error) {
+	listed, err := c.git.run(ctx, "ls-tree", "--name-only", c.HeadSHA, "--", path)
+	if err != nil {
+		return nil, fmt.Errorf("look up %s at head: %w", path, err)
+	}
+	if listed != path {
+		return nil, nil
+	}
 	out, err := c.git.output(ctx, "show", c.HeadSHA+":"+path)
 	if err != nil {
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			return nil, nil // not in the head tree
-		}
-		return nil, err
+		return nil, fmt.Errorf("read %s at head: %w", path, err)
 	}
 	return strings.Split(strings.TrimSuffix(string(out), "\n"), "\n"), nil
+}
+
+// workspaces lists the absolute prefixes analyzers may put on paths.
+func workspaces(root, dir string, env map[string]string) []string {
+	ws := []string{root}
+	add := func(p string) {
+		if p != "" && !slices.Contains(ws, p) {
+			ws = append(ws, p)
+		}
+	}
+	if abs, err := filepath.Abs(dir); err == nil {
+		add(abs)
+		if real, err := filepath.EvalSymlinks(abs); err == nil {
+			add(real)
+		}
+	}
+	for _, k := range []string{"GITHUB_WORKSPACE", "CI_PROJECT_DIR"} {
+		add(env[k])
+	}
+	return ws
 }
 
 // Selected reports whether path passes the project's include and exclude
@@ -214,6 +248,22 @@ type git struct {
 	env []string
 }
 
+// gitError is git exiting unsuccessfully, with what it printed.
+type gitError struct {
+	command string
+	err     error
+	stderr  string
+}
+
+func (e *gitError) Error() string {
+	if e.stderr != "" {
+		return fmt.Sprintf("git %s: %v: %s", e.command, e.err, e.stderr)
+	}
+	return fmt.Sprintf("git %s: %v", e.command, e.err)
+}
+
+func (e *gitError) Unwrap() error { return e.err }
+
 func (g git) output(ctx context.Context, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = g.dir
@@ -222,10 +272,10 @@ func (g git) output(ctx context.Context, args ...string) ([]byte, error) {
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil {
-		if msg := strings.TrimSpace(stderr.String()); msg != "" {
-			return nil, fmt.Errorf("git %s: %w: %s", args[0], err, msg)
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, fmt.Errorf("git %s: %w", args[0], ctxErr)
 		}
-		return nil, fmt.Errorf("git %s: %w", args[0], err)
+		return nil, &gitError{command: args[0], err: err, stderr: strings.TrimSpace(stderr.String())}
 	}
 	return out, nil
 }

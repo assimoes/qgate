@@ -7,8 +7,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
+	"net/url"
 	"regexp"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -36,6 +38,8 @@ type (
 	run struct {
 		Tool    tool     `json:"tool"`
 		Results []result `json:"results"`
+		// OriginalURIBaseIDs resolve artifactLocation.uriBaseId.
+		OriginalURIBaseIDs map[string]artifactLocation `json:"originalUriBaseIds"`
 	}
 	tool struct {
 		Driver driver `json:"driver"`
@@ -70,6 +74,7 @@ type (
 	}
 	result struct {
 		RuleID              string            `json:"ruleId"`
+		Kind                string            `json:"kind"`
 		RuleIndex           *int              `json:"ruleIndex"`
 		Rule                *ruleRef          `json:"rule"`
 		Level               string            `json:"level"`
@@ -93,10 +98,12 @@ type (
 		PhysicalLocation *physicalLocation `json:"physicalLocation"`
 	}
 	physicalLocation struct {
-		ArtifactLocation struct {
-			URI string `json:"uri"`
-		} `json:"artifactLocation"`
-		Region *region `json:"region"`
+		ArtifactLocation artifactLocation `json:"artifactLocation"`
+		Region           *region          `json:"region"`
+	}
+	artifactLocation struct {
+		URI       string `json:"uri"`
+		URIBaseID string `json:"uriBaseId"`
 	}
 	region struct {
 		StartLine   int `json:"startLine"`
@@ -134,8 +141,15 @@ func (Ingestor) Parse(_ context.Context, r io.Reader, _ config.Input, _ *gitctx.
 			version = rn.Tool.Driver.SemanticVersion
 		}
 		rules := indexRules(rn.Tool)
+		notDefects := 0
 		for i, rs := range rn.Results {
-			f, warn, ok := convert(rs, rules)
+			// Only kind "fail" (the default) is a defect; pass,
+			// notApplicable, informational, review and open are not.
+			if rs.Kind != "" && rs.Kind != "fail" {
+				notDefects++
+				continue
+			}
+			f, warn, ok := convert(rs, rules, rn.OriginalURIBaseIDs)
 			if warn != "" {
 				res.Warnings = append(res.Warnings, fmt.Sprintf("run %d (%s) result %d: %s", ri, rn.Tool.Driver.Name, i, warn))
 			}
@@ -144,6 +158,10 @@ func (Ingestor) Parse(_ context.Context, r io.Reader, _ config.Input, _ *gitctx.
 			}
 			f.Source.Version = version
 			res.Findings = append(res.Findings, f)
+		}
+		if notDefects > 0 {
+			res.Warnings = append(res.Warnings, fmt.Sprintf(
+				"run %d (%s): skipped %d results whose kind is not \"fail\"", ri, rn.Tool.Driver.Name, notDefects))
 		}
 	}
 	return res, nil
@@ -199,7 +217,7 @@ func (idx ruleIndex) find(rs result) (string, *rule) {
 
 // convert maps one result. It returns ok=false for results qgate cannot
 // place, with a warning saying why.
-func convert(rs result, rules ruleIndex) (ingest.Finding, string, bool) {
+func convert(rs result, rules ruleIndex, bases map[string]artifactLocation) (ingest.Finding, string, bool) {
 	id, rl := rules.find(rs)
 	if id == "" {
 		return ingest.Finding{}, "result has no rule ID; skipped", false
@@ -214,7 +232,11 @@ func convert(rs result, rules ruleIndex) (ingest.Finding, string, bool) {
 	f.RuleID = id
 	f.Message = rs.Message.Text
 	f.Title = title(id, rl)
-	f.Location.Path = phys.ArtifactLocation.URI
+	p, err := resolvePath(phys.ArtifactLocation, bases)
+	if err != nil {
+		return ingest.Finding{}, fmt.Sprintf("result for rule %s: %v; skipped", id, err), false
+	}
+	f.Location.Path = p
 	if rg := phys.Region; rg != nil && rg.StartLine > 0 {
 		f.Location.StartLine = rg.StartLine
 		f.Location.EndLine = max(rg.EndLine, rg.StartLine)
@@ -242,6 +264,43 @@ func convert(rs result, rules ruleIndex) (ingest.Finding, string, bool) {
 	f.CWE = cwes(rl)
 	f.ToolFingerprint = toolFingerprint(rs)
 	return f, "", true
+}
+
+// maxBaseDepth bounds uriBaseId chains, which may refer to each other.
+const maxBaseDepth = 8
+
+// resolvePath turns an artifact location into a file path: the URI is
+// percent-decoded, and a uriBaseId is resolved through the run's
+// originalUriBaseIds. A base of the filesystem root ("file:///") adds no
+// information, so a URI relative to it stays relative. The result is
+// absolute or repo-relative; normalization makes it repo-relative.
+func resolvePath(loc artifactLocation, bases map[string]artifactLocation) (string, error) {
+	u, err := url.Parse(loc.URI)
+	if err != nil {
+		return "", fmt.Errorf("invalid artifact URI %q", loc.URI)
+	}
+	for depth := 0; !u.IsAbs() && loc.URIBaseID != "" && depth < maxBaseDepth; depth++ {
+		base, ok := bases[loc.URIBaseID]
+		if !ok || base.URI == "" {
+			break // an unknown base is resolved by the analyzer's working directory
+		}
+		bu, err := url.Parse(base.URI)
+		if err != nil {
+			return "", fmt.Errorf("invalid base URI %q for %s", base.URI, loc.URIBaseID)
+		}
+		if bu.Scheme == "file" && (bu.Path == "/" || bu.Path == "") {
+			break
+		}
+		if !strings.HasSuffix(bu.Path, "/") {
+			bu.Path += "/"
+		}
+		u = bu.ResolveReference(u)
+		loc = base
+	}
+	if u.Scheme != "" && u.Scheme != "file" {
+		return "", fmt.Errorf("artifact %q is not a file", loc.URI)
+	}
+	return u.Path, nil
 }
 
 func title(id string, rl *rule) string {
@@ -324,12 +383,7 @@ func cwes(rl *rule) []string {
 	if len(set) == 0 {
 		return nil
 	}
-	out := make([]string, 0, len(set))
-	for c := range set {
-		out = append(out, c)
-	}
-	sort.Strings(out)
-	return out
+	return slices.Sorted(maps.Keys(set))
 }
 
 // toolFingerprint combines the result's fingerprints into one stable
@@ -342,11 +396,7 @@ func toolFingerprint(rs result) string {
 	if len(fps) == 0 {
 		return ""
 	}
-	keys := make([]string, 0, len(fps))
-	for k := range fps {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(fps))
 	parts := make([]string, len(keys))
 	for i, k := range keys {
 		parts[i] = k + "=" + fps[k]
