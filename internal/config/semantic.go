@@ -24,7 +24,10 @@ func checkDuplicates(layer map[string]any, file string) Errors {
 		first := map[any]int{}
 		for i, it := range items {
 			m, _ := it.(map[string]any)
-			k := m[key]
+			k, ok := m[key]
+			if !ok {
+				continue // a missing key is reported as a required property
+			}
 			if j, dup := first[k]; dup {
 				errs = append(errs, errorf(file, path{list}.index(i).key(key).String(),
 					"duplicate %s %v (first defined at %s)", key, k, path{list}.index(j)))
@@ -267,7 +270,7 @@ func (c *checker) globs() {
 	for i, cm := range listAt(c.doc, "category_mappings") {
 		m, _ := cm.(map[string]any)
 		match, _ := m["match"].(map[string]any)
-		for _, k := range []string{"rule_id", "path"} {
+		for _, k := range []string{"rule_id", "path", "cwe"} {
 			check(path{"category_mappings"}.index(i).key("match").key(k), match[k])
 		}
 	}

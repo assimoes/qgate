@@ -247,6 +247,11 @@ func TestValidateRejectsSemanticErrors(t *testing.T) {
 			want:   []string{".qgate.yaml: inputs[1].name:", "duplicate name semgrep"},
 		},
 		{
+			name:   "inputs without names are not reported as duplicates of each other",
+			config: "version: 1\ninputs:\n  - { format: sarif, path: a }\n  - { format: sarif, path: b }\n",
+			want:   []string{"inputs[0]: missing property 'name'"},
+		},
+		{
 			name:   "invalid glob",
 			config: "version: 1\nproject: { exclude: [\"vendor/[\"] }\n",
 			want:   []string{"project.exclude[0]:", "invalid glob"},

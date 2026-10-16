@@ -76,6 +76,17 @@ Concurrency exists only in pipeline steps 3 (inputs) and 6 (agents) and in provi
 - **No hidden concurrency in libraries.** Functions are synchronous unless their name and doc say otherwise; callers decide whether to run them concurrently.
 - **Verify.** Every package with concurrent code is tested under `-race`, including cancellation and timeout paths (fake provider delays, deadline expiry), and asserts that no goroutine outlives its test. A leak-detection helper such as `go.uber.org/goleak` is a new dependency, so log it in `docs/DECISIONS.md` before adding it.
 
+## Finishing a ticket
+
+Every finished ticket gets a `## Demo` section in its file under `.scratch/qgate/issues/`: the steps to show what the ticket delivered to stakeholders, by hand, with the real binary. Write it as a script someone can follow live:
+
+- Start from nothing: build the binary (`go build -o /tmp/qgate ./cmd/qgate`) and set up a throwaway repo, config and analyzer reports with copy-pasteable commands.
+- One step per behavior the ticket added, each with the command to run and what the audience should see (the outcome line, the exit code, the relevant part of the report or error).
+- Show the failure cases the ticket handles, not only the happy path.
+- Keep it short: what a five-minute demo needs, not a test plan.
+
+Run the steps yourself before calling the ticket done, and fix the steps or the code if anything differs from what the section says.
+
 ## Agent skills
 
 ### Issue tracker

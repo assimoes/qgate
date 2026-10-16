@@ -158,4 +158,14 @@ A category mapping matches when every criterion it sets matches: `rule_id` again
 
 ## 2026-10-16 — What tool dedup merges
 
-Design §9 step 9 merges findings from different inputs with identical fingerprints or identical `(path, start_line, CWE set)`. Fingerprints include the namespaced rule ID (step 5), and input names are unique, so fingerprints from different inputs never collide; the fingerprint criterion is implemented but in practice the location criterion does the merging. The location criterion requires a non-empty CWE set: without it, any two findings from different tools on the same line would merge. Merging is transitive across inputs (union-find), never within a single input. The survivor is the highest severity, then the alphabetically first input name, then canonical order; it keeps its own fingerprint, rule ID and text, and the others become its `merged_sources`, sorted by input and rule ID. All findings are then put in one canonical order (path, line, rule, column, input, fingerprint, message), so the report does not depend on the order of inputs.
+Design §9 step 9 merges findings from different inputs with identical fingerprints or identical `(path, start_line, CWE set)`. Fingerprints include the namespaced rule ID (step 5), and input names are unique, so fingerprints from different inputs never collide; the fingerprint criterion is implemented but in practice the location criterion does the merging. The location criterion requires a non-empty CWE set: without it, any two findings from different tools on the same line would merge.
+
+Findings are taken strongest first (severity, then the alphabetically first input name, then canonical order) and each joins the first group that has the same status, no finding from its input yet, and a key in common with a member; otherwise it starts a new group. So a group's first member is its survivor, two findings of one input are never merged, and a `new` finding is never folded into an out-of-scope (or later baselined or suppressed) one, which would let adding an analyzer raise a score. The survivor keeps its own fingerprint, rule ID and text; the others become its `merged_sources`, sorted by input and rule ID. All findings are then put in one canonical order (path, line, rule, column, input, fingerprint, message), so the report does not depend on the order of inputs. Dedup is the last excusal step: baseline and suppressions (tickets 10, 36, 37) run before it.
+
+## 2026-10-16 — CWE patterns in category mappings
+
+`match.cwe` is validated as a glob when the config loads and matched case-insensitively against the finding's CWEs, which are normalized to `CWE-<n>`: `cwe-8*` matches `CWE-89`. A bare number such as `89` does not match; write `CWE-89`.
+
+## 2026-10-16 — Builtin severity tables are functions
+
+Each format's builtin severity mapping is a function with a switch rather than a package-level map, so there is no package state anyone could mutate.

@@ -193,3 +193,84 @@ func TestDedupIsIndependentOfInputOrder(t *testing.T) {
 		}
 	}
 }
+
+func TestDedupNeverHidesANewFinding(t *testing.T) {
+	t.Parallel()
+	repo, base, _ := history(t)
+	repo.Write(".qgate.yaml", `version: 1
+inputs:
+  - { name: aaa, format: sarif, path: aaa.sarif, category_default: security }
+  - { name: zzz, format: sarif, path: zzz.sarif, category_default: security }
+`)
+	// Same path, start line and CWE. aaa's finding is out of scope (line 4
+	// is unchanged); zzz's spans the changed line 5, so it is new.
+	repo.Write("aaa.sarif", sarifLog(map[string][]sarifResult{"A": {
+		{rule: "r1", level: "error", path: "a.go", line: 4, cwe: "CWE-89"},
+	}}))
+	repo.Write("zzz.sarif", sarifLog(map[string][]sarifResult{"Z": {
+		{rule: "r2", level: "note", path: "a.go", line: 4, endLine: 5, cwe: "CWE-89"},
+	}}))
+	res := clitest.Run(t, clitest.Options{Dir: repo.Dir}, "run", "--base", base)
+	found := findingsByRule(t, res)
+	if found["zzz:r2"]["status"] != "new" {
+		t.Errorf("the new finding was hidden: %v", keys(found))
+	}
+	// zzz's low finding still costs security its 2 points.
+	if got := res.DecodeReport(t)["scores"].(map[string]any)["categories"].(map[string]any)["security"]; got != float64(98) {
+		t.Errorf("security = %v, want 98", got)
+	}
+}
+
+func TestDedupNeverMergesFindingsOfOneInput(t *testing.T) {
+	t.Parallel()
+	repo, base, _ := history(t)
+	repo.Write(".qgate.yaml", `version: 1
+inputs:
+  - { name: semgrep, format: sarif, path: s.sarif, category_default: security }
+  - { name: codeql, format: sarif, path: c.sarif, category_default: security }
+`)
+	repo.Write("s.sarif", sarifLog(map[string][]sarifResult{"Semgrep": {
+		{rule: "x1", level: "error", path: "a.go", line: 5, cwe: "CWE-89"},   // high
+		{rule: "x2", level: "warning", path: "a.go", line: 5, cwe: "CWE-89"}, // medium
+	}}))
+	repo.Write("c.sarif", sarifLog(map[string][]sarifResult{"CodeQL": {
+		{rule: "y", secSev: "9.8", path: "a.go", line: 5, cwe: "CWE-89"}, // critical
+	}}))
+	found := findingsByRule(t, clitest.Run(t, clitest.Options{Dir: repo.Dir}, "run", "--base", base))
+	if len(found) != 2 || found["codeql:y"] == nil || found["semgrep:x2"] == nil {
+		t.Fatalf("findings = %v, want codeql:y (with semgrep:x1 merged) and semgrep:x2", keys(found))
+	}
+	merged := found["codeql:y"]["merged_sources"].([]any)
+	if len(merged) != 1 || merged[0].(map[string]any)["rule_id"] != "semgrep:x1" {
+		t.Errorf("merged_sources = %v, want only semgrep:x1", merged)
+	}
+}
+
+func TestCWEMappingPatterns(t *testing.T) {
+	t.Parallel()
+	t.Run("matched case-insensitively", func(t *testing.T) {
+		t.Parallel()
+		repo, base, _ := history(t)
+		repo.Write(".qgate.yaml", `version: 1
+inputs:
+  - { name: semgrep, format: sarif, path: s.sarif }
+category_mappings:
+  - { match: { cwe: "cwe-8*" }, category: security }
+`)
+		repo.Write("s.sarif", sarifLog(map[string][]sarifResult{"S": {
+			{rule: "sqli", level: "error", path: "a.go", line: 5, cwe: "CWE-89"},
+		}}))
+		found := findingsByRule(t, clitest.Run(t, clitest.Options{Dir: repo.Dir}, "run", "--base", base))
+		if got := found["semgrep:sqli"]["category"]; got != "security" {
+			t.Errorf("category = %v, want security", got)
+		}
+	})
+	t.Run("validated at load", func(t *testing.T) {
+		t.Parallel()
+		runConfigErrorCases(t, []configErrorCase{{
+			name:   "invalid cwe glob",
+			config: "version: 1\ncategory_mappings:\n  - { match: { cwe: \"[\" }, category: security }\n",
+			want:   []string{"category_mappings[0].match.cwe:", "invalid glob"},
+		}})
+	})
+}

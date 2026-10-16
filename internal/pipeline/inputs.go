@@ -78,6 +78,9 @@ func RunInputs(ctx context.Context, deps InputDeps, cfg config.Config, gc *gitct
 		res.Metrics = append(res.Metrics, out.metrics...)
 		res.Statuses = append(res.Statuses, st)
 	}
+	// Tool dedup is the last excusal step (design §9 step 9). When the
+	// baseline and suppression steps arrive (tickets 10, 36, 37) they run
+	// on all before this call.
 	res.Findings = normalize.DedupTools(all)
 	return res, nil
 }

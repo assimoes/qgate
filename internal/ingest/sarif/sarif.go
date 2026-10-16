@@ -118,11 +118,19 @@ type (
 )
 
 // levelSeverity is the builtin mapping for SARIF result levels.
-var levelSeverity = map[string]model.Severity{
-	"error":   model.SeverityHigh,
-	"warning": model.SeverityMedium,
-	"note":    model.SeverityLow,
-	"none":    model.SeverityInfo,
+func levelSeverity(level string) (model.Severity, bool) {
+	switch level {
+	case "error":
+		return model.SeverityHigh, true
+	case "warning":
+		return model.SeverityMedium, true
+	case "note":
+		return model.SeverityLow, true
+	case "none":
+		return model.SeverityInfo, true
+	default:
+		return 0, false
+	}
 }
 
 // Parse reads every run of a SARIF log.
@@ -257,7 +265,7 @@ func convert(rs result, rules ruleIndex, bases map[string]artifactLocation) (ing
 	f.RawSeverity = level
 	if score, ok := securitySeverity(rs.Properties, rl); ok {
 		f.DefaultSeverity = ingest.SeverityPtr(scoreSeverity(score))
-	} else if s, ok := levelSeverity[level]; ok {
+	} else if s, ok := levelSeverity(level); ok {
 		f.DefaultSeverity = ingest.SeverityPtr(s)
 	}
 

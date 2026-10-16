@@ -165,7 +165,9 @@ func matches(m config.CategoryMatch, f model.Finding) bool {
 		return false
 	}
 	if m.CWE != "" {
-		return slices.ContainsFunc(f.CWE, func(c string) bool { return glob(m.CWE, c) })
+		// CWE IDs are normalized to "CWE-<n>"; patterns match regardless of case.
+		pattern := strings.ToUpper(m.CWE)
+		return slices.ContainsFunc(f.CWE, func(c string) bool { return glob(pattern, strings.ToUpper(c)) })
 	}
 	return true
 }

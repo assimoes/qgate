@@ -23,6 +23,7 @@ type sarifResult struct {
 	level     string // "" omits it
 	path      string
 	line      int // 0 omits the region (file-level)
+	endLine   int // 0 omits it
 	secSev    string
 	partialFP string
 	cwe       string
@@ -51,7 +52,11 @@ func sarifLog(runs map[string][]sarifResult) string {
 
 			phys := map[string]any{"artifactLocation": map[string]any{"uri": r.path}}
 			if r.line > 0 {
-				phys["region"] = map[string]any{"startLine": r.line}
+				region := map[string]any{"startLine": r.line}
+				if r.endLine > 0 {
+					region["endLine"] = r.endLine
+				}
+				phys["region"] = region
 			}
 			res := map[string]any{
 				"ruleId":    r.rule,
