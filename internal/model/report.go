@@ -91,10 +91,20 @@ const (
 	InputFailed InputState = "failed"
 )
 
+// InputKind says what an input's format reports.
+type InputKind string
+
+// Input kinds.
+const (
+	InputKindFindings InputKind = "findings"
+	InputKindMetrics  InputKind = "metrics" // metrics only; assesses no category unless declared
+)
+
 // InputStatus summarizes one input's run.
 type InputStatus struct {
 	Name     string     `json:"name"`
 	Format   string     `json:"format"`
+	Kind     InputKind  `json:"kind"`
 	Status   InputState `json:"status"`
 	Findings int        `json:"findings"`
 	Metrics  int        `json:"metrics"`

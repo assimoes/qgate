@@ -3,7 +3,6 @@
 package model
 
 import (
-	"cmp"
 	"fmt"
 )
 
@@ -159,20 +158,4 @@ type Finding struct {
 	StatusNote    string         `json:"status_note,omitempty"`
 	Annotations   []Annotation   `json:"annotations,omitempty"`
 	MergedSources []MergedSource `json:"merged_sources,omitempty"`
-}
-
-// CompareMetrics orders metrics by name, scope and source, the canonical
-// order reports use.
-func CompareMetrics(a, b Metric) int {
-	return cmp.Or(cmp.Compare(a.Name, b.Name), cmp.Compare(a.Scope, b.Scope), cmp.Compare(a.Source.Name, b.Source.Name))
-}
-
-// Metric is a numeric measurement with a metric scope: "diff", "repo" or
-// "file:<path>".
-type Metric struct {
-	Name   string  `json:"name"`
-	Value  float64 `json:"value"`
-	Unit   string  `json:"unit"`
-	Scope  string  `json:"scope"`
-	Source Source  `json:"source"`
 }

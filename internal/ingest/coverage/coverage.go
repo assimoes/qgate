@@ -3,12 +3,16 @@
 package coverage
 
 import (
+	"context"
+	"fmt"
+	"maps"
 	"math"
 	"path"
 	"slices"
 	"strings"
 
 	"qgate/internal/gitctx"
+	"qgate/internal/ingest"
 	"qgate/internal/model"
 )
 
@@ -25,26 +29,52 @@ type Branches struct {
 
 // File is one source file's coverage.
 type File struct {
-	Path     string           // as the report wrote it
+	// Paths are what the report's path for the file could mean, most
+	// specific first: Cobertura's filename joined to each <source>, then
+	// the filename alone.
+	Paths    []string
 	Lines    map[int]int      // line → hit count, for instrumented lines
 	Branches map[int]Branches // line → branch outcomes, for lines with branches
 }
 
-// Merge adds other's data into f: hits are summed, branches keep the larger
-// count, as when one file appears in several classes or records.
-func (f *File) Merge(other File) {
-	for l, h := range other.Lines {
-		f.Lines[l] += h
+// NewFile returns an empty File for the given candidate paths.
+func NewFile(paths ...string) *File {
+	return &File{Paths: paths, Lines: map[int]int{}, Branches: map[int]Branches{}}
+}
+
+// Files collects coverage by file, merging repeats: hits are summed,
+// branches keep the larger count, as when one file appears in several
+// Cobertura classes or LCOV records.
+type Files map[string]*File
+
+// Add merges f into the collection.
+func (fs Files) Add(f *File) {
+	key := strings.Join(f.Paths, "\x00")
+	cur, ok := fs[key]
+	if !ok {
+		fs[key] = f
+		return
 	}
-	for l, b := range other.Branches {
-		cur := f.Branches[l]
-		f.Branches[l] = Branches{Covered: max(cur.Covered, b.Covered), Total: max(cur.Total, b.Total)}
+	for l, h := range f.Lines {
+		cur.Lines[l] += h
+	}
+	for l, b := range f.Branches {
+		c := cur.Branches[l]
+		cur.Branches[l] = Branches{Covered: max(c.Covered, b.Covered), Total: max(c.Total, b.Total)}
 	}
 }
 
-// NewFile returns an empty File for p.
-func NewFile(p string) File {
-	return File{Path: p, Lines: map[int]int{}, Branches: map[int]Branches{}}
+// Result computes the collection's metrics into an ingest result.
+func (fs Files) Result(ctx context.Context, gc *gitctx.Context, warnings []string) (ingest.Result, error) {
+	files := make([]*File, 0, len(fs))
+	for _, k := range slices.Sorted(maps.Keys(fs)) {
+		files = append(files, fs[k])
+	}
+	metrics, more, err := measure(ctx, files, gc)
+	if err != nil {
+		return ingest.Result{}, err
+	}
+	return ingest.Result{Metrics: metrics, Warnings: append(warnings, more...)}, nil
 }
 
 // tally counts covered and total units.
@@ -59,15 +89,22 @@ func (t tally) percent() float64 {
 	return math.Round(float64(t.covered)*10000/float64(t.total)) / 100
 }
 
-// Metrics computes line and branch coverage at repo scope, and at diff
+// measure computes line and branch coverage at repo scope, and at diff
 // scope over the lines the change added or modified. Branch metrics appear
 // only when the report has branch data. With nothing instrumented on
 // changed lines, diff coverage is 100: the change left nothing uncovered.
 // gc may be nil (no diff), which yields repo metrics only.
-func Metrics(files []File, gc *gitctx.Context) []model.Metric {
+func measure(ctx context.Context, files []*File, gc *gitctx.Context) ([]model.Metric, []string, error) {
 	var repoLines, repoBranches, diffLines, diffBranches tally
+	var warnings []string
 	for _, f := range files {
-		changed := changedRanges(f.Path, gc)
+		changed, warn, err := changedRanges(ctx, f, gc)
+		if err != nil {
+			return nil, nil, err
+		}
+		if warn != "" {
+			warnings = append(warnings, warn)
+		}
 		for l, hits := range f.Lines {
 			c := 0
 			if hits > 0 {
@@ -86,51 +123,100 @@ func Metrics(files []File, gc *gitctx.Context) []model.Metric {
 		}
 	}
 
-	metric := func(name, scope string, t tally) model.Metric {
-		return model.Metric{Name: name, Value: t.percent(), Unit: "percent", Scope: scope}
+	metric := func(name string, scope model.MetricScope, t tally) model.Metric {
+		return model.Metric{Name: name, Value: t.percent(), Unit: model.UnitPercent, Scope: scope}
 	}
 	var out []model.Metric
 	if repoLines.total > 0 {
-		out = append(out, metric(LineMetric, "repo", repoLines))
+		out = append(out, metric(LineMetric, model.MetricScopeRepo, repoLines))
 		if gc != nil {
-			out = append(out, metric(LineMetric, "diff", diffLines))
+			out = append(out, metric(LineMetric, model.MetricScopeDiff, diffLines))
 		}
 	}
 	if repoBranches.total > 0 {
-		out = append(out, metric(BranchMetric, "repo", repoBranches))
+		out = append(out, metric(BranchMetric, model.MetricScopeRepo, repoBranches))
 		if gc != nil {
-			out = append(out, metric(BranchMetric, "diff", diffBranches))
+			out = append(out, metric(BranchMetric, model.MetricScopeDiff, diffBranches))
 		}
 	}
-	return out
+	return out, warnings, nil
 }
 
-// changedRanges finds the changed file a coverage path refers to. Coverage
-// tools write paths relative to the repo, absolute, or as import paths
-// ("example.com/org/app/a.go"), so a path matches a changed file when it
-// equals it, or ends with "/" and the changed file's path, after workspace
-// prefixes are removed.
-func changedRanges(p string, gc *gitctx.Context) []gitctx.LineRange {
+// changedRanges finds which changed file, if any, a coverage file is.
+// A candidate path that names a file in the repo is that file, changed or
+// not. Otherwise the report wrote some other form of the path (an import
+// path, another machine's absolute path), and the file is the changed file
+// whose path is the longest suffix of a candidate; a tie is ambiguous and
+// matches nothing, with a warning.
+func changedRanges(ctx context.Context, f *File, gc *gitctx.Context) ([]gitctx.LineRange, string, error) {
 	if gc == nil {
+		return nil, "", nil
+	}
+	cleaned := make([]string, len(f.Paths))
+	for i, p := range f.Paths {
+		cleaned[i] = repoRelative(p, gc.Workspaces)
+		if path.IsAbs(cleaned[i]) || strings.HasPrefix(cleaned[i], "../") {
+			continue
+		}
+		ok, err := gc.HasFile(ctx, cleaned[i])
+		if err != nil {
+			return nil, "", fmt.Errorf("match coverage path %s: %w", p, err)
+		}
+		if ok {
+			cf, _ := gc.File(cleaned[i])
+			return liveRanges(cf), "", nil
+		}
+	}
+
+	var best []gitctx.ChangedFile
+	bestLen := 0
+	for _, c := range cleaned {
+		for _, cf := range gc.Files {
+			if !strings.HasSuffix(c, "/"+cf.Path) || len(cf.Path) < bestLen {
+				continue
+			}
+			if len(cf.Path) > bestLen {
+				best, bestLen = nil, len(cf.Path)
+			}
+			if !slices.ContainsFunc(best, func(b gitctx.ChangedFile) bool { return b.Path == cf.Path }) {
+				best = append(best, cf)
+			}
+		}
+	}
+	switch len(best) {
+	case 0:
+		return nil, "", nil
+	case 1:
+		return liveRanges(best[0]), "", nil
+	default:
+		names := make([]string, len(best))
+		for i, b := range best {
+			names[i] = b.Path
+		}
+		return nil, fmt.Sprintf("coverage for %s could be any of %s; it counts for none of them at diff scope",
+			f.Paths[len(f.Paths)-1], strings.Join(names, ", ")), nil
+	}
+}
+
+// liveRanges are a changed file's added ranges, none for deleted or binary
+// files.
+func liveRanges(cf gitctx.ChangedFile) []gitctx.LineRange {
+	if cf.Status == gitctx.StatusDeleted || cf.Binary {
 		return nil
 	}
+	return cf.AddedRanges
+}
+
+// repoRelative strips a workspace prefix and cleans the path.
+func repoRelative(p string, workspaces []string) string {
 	p = strings.ReplaceAll(p, `\`, "/")
-	for _, ws := range gc.Workspaces {
+	for _, ws := range workspaces {
 		if rest, ok := strings.CutPrefix(p, strings.TrimSuffix(ws, "/")+"/"); ok {
 			p = rest
 			break
 		}
 	}
-	p = path.Clean(p)
-	for _, f := range gc.Files {
-		if f.Status == gitctx.StatusDeleted || f.Binary {
-			continue
-		}
-		if p == f.Path || strings.HasSuffix(p, "/"+f.Path) {
-			return f.AddedRanges
-		}
-	}
-	return nil
+	return path.Clean(p)
 }
 
 func inRanges(line int, ranges []gitctx.LineRange) bool {

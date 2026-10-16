@@ -12,6 +12,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/sourcegraph/go-diff/diff"
@@ -62,6 +63,9 @@ type Context struct {
 
 	git   git
 	index map[string]int
+
+	treeMu sync.Mutex      // guards tree; inputs run concurrently
+	tree   map[string]bool // every file at head, loaded on first HasFile
 }
 
 // Options select the commits and files to review.
@@ -156,6 +160,23 @@ func (c *Context) FileLines(ctx context.Context, path string) ([]string, error) 
 		return nil, fmt.Errorf("read %s at head: %w", path, err)
 	}
 	return strings.Split(strings.TrimSuffix(string(out), "\n"), "\n"), nil
+}
+
+// HasFile reports whether path is a file in the head commit's tree.
+func (c *Context) HasFile(ctx context.Context, path string) (bool, error) {
+	c.treeMu.Lock()
+	defer c.treeMu.Unlock()
+	if c.tree == nil {
+		out, err := c.git.output(ctx, "-c", "core.quotePath=off", "ls-tree", "-r", "--name-only", "-z", c.HeadSHA)
+		if err != nil {
+			return false, fmt.Errorf("list files at head: %w", err)
+		}
+		c.tree = map[string]bool{}
+		for _, p := range strings.Split(strings.TrimSuffix(string(out), "\x00"), "\x00") {
+			c.tree[p] = true
+		}
+	}
+	return c.tree[path], nil
 }
 
 // workspaces lists the absolute prefixes analyzers may put on paths.

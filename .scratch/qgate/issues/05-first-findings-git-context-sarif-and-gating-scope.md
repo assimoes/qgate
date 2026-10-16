@@ -4,7 +4,7 @@
 
 **Blocked by:** 04 (Gate: Phase 0 acceptance)
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 - [x] A Seam A fixture-repo helper creates commits programmatically covering added, modified, renamed and deleted files
 - [x] `--base`/`--head` work; without them the merge-base fallback is used

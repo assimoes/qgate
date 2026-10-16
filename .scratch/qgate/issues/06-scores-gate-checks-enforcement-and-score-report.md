@@ -4,7 +4,7 @@
 
 **Blocked by:** 05 (First findings: git context, SARIF and gating scope)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] Scoring v1 is a pure, integer, order-independent function; the design doc's worked example scores exactly 76 (Seam B golden test)
 - [x] Seam B property tests: order independence; adding a new finding never raises a score; excused findings never change scores; agent penalty ≤ `agent_max_penalty`

@@ -96,7 +96,7 @@ func (a app) runPipeline(ctx context.Context, started time.Time, res *config.Res
 	decision, err := pipeline.Decide(pipeline.Evidence{
 		Findings: inputs.Findings, Metrics: inputs.Metrics,
 		Inputs: inputs.Statuses, Degraded: pipeline.Degraded(inputs.Statuses),
-	}, cfg, a.inv.Ingestors.ProducesFindings)
+	}, cfg)
 	if err != nil {
 		return fmt.Errorf("decide: %w", err)
 	}

@@ -84,7 +84,7 @@ func (Ingestor) Parse(_ context.Context, r io.Reader, _ config.Input, _ *gitctx.
 		return ingest.Result{}, errors.New("decode junit: empty document")
 	}
 	count := func(name string, n int) model.Metric {
-		return model.Metric{Name: name, Value: float64(n), Unit: "count", Scope: "repo"}
+		return model.Metric{Name: name, Value: float64(n), Unit: model.UnitCount, Scope: model.MetricScopeRepo}
 	}
 	return ingest.Result{Metrics: []model.Metric{
 		count(TotalMetric, total), count(FailedMetric, failed), count(SkippedMetric, skipped),

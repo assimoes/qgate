@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] `qgate run` with no inputs writes a JSON report that validates against the report schema and exits 0
 - [ ] `qgate run` prints a warning that only builtin policy is active when no repo config exists

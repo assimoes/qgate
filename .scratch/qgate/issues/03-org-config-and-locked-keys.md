@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 (Repo config and profiles)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] `--org-config` accepts a path or HTTPS URL and is layered between builtin defaults and the repo config
 - [ ] A URL org config pinned with `org_config_sha256` loads on match and exits 2 on mismatch

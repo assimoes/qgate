@@ -4,7 +4,7 @@
 
 **Blocked by:** 05 (First findings: git context, SARIF and gating scope)
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 - [ ] Checkstyle XML is ingested (Seam C golden tests over golangci-lint and ESLint output)
 - [x] Per-input `severity_map` applies before builtin defaults

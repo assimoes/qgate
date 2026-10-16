@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"qgate/internal/clitest"
+	"qgate/internal/ingest"
 )
 
 // a.go has 10 lines; history changes line 5. The coverage reports below
@@ -216,4 +217,97 @@ func mapKeys(m map[string]map[string]any) []string {
 		out = append(out, k)
 	}
 	return out
+}
+
+func TestCoveragePathsMatchTheRightChangedFile(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		changePk bool    // also change pkg/a.go
+		want     float64 // coverage.line@diff
+	}{
+		// Only a.go changed (line 2, covered). pkg/a.go's uncovered line 2
+		// must not count: it is a different, unchanged file.
+		{"unchanged file with the same base name", false, 100},
+		// Both changed on line 2: a.go covered, pkg/a.go not.
+		{"both files changed", true, 50},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			repo := clitest.NewRepo(t)
+			repo.Write("a.go", clitest.Lines(3))
+			repo.Write("pkg/a.go", clitest.Lines(3))
+			base := repo.Commit("base")
+			repo.Write("a.go", strings.Replace(clitest.Lines(3), "line 2\n", "line 2 changed\n", 1))
+			if tt.changePk {
+				repo.Write("pkg/a.go", strings.Replace(clitest.Lines(3), "line 2\n", "line 2 changed\n", 1))
+			}
+			repo.Commit("head")
+			repo.Write(".qgate.yaml", "version: 1\ninputs:\n  - { name: cov, format: lcov, path: lcov.info }\n")
+			repo.Write("lcov.info", "SF:a.go\nDA:2,1\nend_of_record\nSF:pkg/a.go\nDA:2,0\nend_of_record\n")
+			got := metricsByKey(t, clitest.Run(t, clitest.Options{Dir: repo.Dir}, "run", "--base", base))
+			if got["coverage.line@diff"] != tt.want {
+				t.Errorf("coverage.line@diff = %v, want %v", got["coverage.line@diff"], tt.want)
+			}
+		})
+	}
+}
+
+func TestCoberturaFilenamesAreRelativeToSources(t *testing.T) {
+	t.Parallel()
+	repo := clitest.NewRepo(t)
+	repo.Write("src/app/views.py", clitest.Lines(3))
+	base := repo.Commit("base")
+	repo.Write("src/app/views.py", strings.Replace(clitest.Lines(3), "line 2\n", "line 2 changed\n", 1))
+	repo.Commit("head")
+	repo.Write(".qgate.yaml", `version: 1
+inputs:
+  - { name: cov, format: cobertura, path: coverage.xml }
+profiles:
+  dev: { enforcement: blocking, gate: { metrics: [{ name: coverage.line, scope: diff, op: ">=", value: 80 }] } }
+`)
+	repo.Write("coverage.xml", `<coverage><sources><source>`+repo.Dir+`/src</source></sources>
+<packages><package><classes><class filename="app/views.py"><lines>
+<line number="1" hits="1"/><line number="2" hits="0"/>
+</lines></class></classes></package></packages></coverage>`)
+	res := clitest.Run(t, clitest.Options{Dir: repo.Dir}, "run", "--base", base)
+	if got := metricsByKey(t, res)["coverage.line@diff"]; got != 0 {
+		t.Errorf("coverage.line@diff = %v, want 0 (src/app/views.py's changed line is uncovered)", got)
+	}
+	if res.Code != 1 {
+		t.Errorf("exit code = %d, want 1: the gate must fail", res.Code)
+	}
+}
+
+func TestRescoringDoesNotDependOnTheBinarysFormats(t *testing.T) {
+	t.Parallel()
+	repo, base, _ := history(t)
+	repo.Write(".qgate.yaml", `version: 1
+inputs:
+  - { name: cov, format: lcov, path: lcov.info }
+  - { name: lint, format: sarif, path: lint.sarif }
+`)
+	repo.Write("lcov.info", lcovInfo)
+	repo.Write("lint.sarif", sarifLog(map[string][]sarifResult{"L": {{rule: "r", level: "error", path: "a.go", line: 5}}}))
+	run := clitest.Run(t, clitest.Options{Dir: repo.Dir}, "run", "--base", base)
+	if run.Code != 0 {
+		t.Fatalf("exit code = %d; stderr:\n%s", run.Code, run.Stderr)
+	}
+	for _, in := range run.DecodeReport(t)["inputs"].([]any) {
+		m := in.(map[string]any)
+		want := map[string]string{"cov": "metrics", "lint": "findings"}[m["name"].(string)]
+		if m["kind"] != want {
+			t.Errorf("input %v kind = %v, want %s", m["name"], m["kind"], want)
+		}
+	}
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "r.json"), run.Report, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// A build that knows no formats at all still reproduces the decision.
+	res := clitest.Run(t, clitest.Options{Dir: dir, Ingestors: ingest.NewRegistry()}, "score", "--report", "r.json")
+	if res.Code != 0 {
+		t.Errorf("exit code = %d, want 0; stderr:\n%s", res.Code, res.Stderr)
+	}
 }

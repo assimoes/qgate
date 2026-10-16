@@ -80,7 +80,7 @@ func (a app) score(cmd *cobra.Command, path string) error {
 	// deadlines) is a fact of the original run, recorded as gate.degraded.
 	decision, err := pipeline.Decide(pipeline.Evidence{
 		Findings: saved.Findings, Metrics: saved.Metrics, Inputs: saved.Inputs, Degraded: storedGate.Degraded,
-	}, cfg, a.inv.Ingestors.ProducesFindings)
+	}, cfg)
 	if err != nil {
 		return fmt.Errorf("recompute decision: %w", err)
 	}

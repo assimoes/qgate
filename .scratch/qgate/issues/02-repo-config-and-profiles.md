@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 (Walking skeleton)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Repo config is discovered via flag, `QGATE_CONFIG`, then `.qgate.yaml` / `.qgate.yml`; flags beat env
 - [ ] `qgate validate --stage staging` prints the resolved config for the design doc's reference config without network access, given the environment variables it interpolates (an unset one is a config error)

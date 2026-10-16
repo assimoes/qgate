@@ -36,7 +36,19 @@
         "params": { "type": "object" }
       }
     },
-    "inputs": { "type": "array", "items": { "type": "object" } },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "format", "kind", "status"],
+        "properties": {
+          "name": { "type": "string" },
+          "format": { "type": "string" },
+          "kind": { "enum": ["findings", "metrics"] },
+          "status": { "enum": ["ok", "failed"] }
+        }
+      }
+    },
     "agents": { "type": "array", "items": { "type": "object" } },
     "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
     "metrics": { "type": "array", "items": { "$ref": "#/$defs/metric" } },

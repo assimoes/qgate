@@ -66,8 +66,12 @@ func RunInputs(ctx context.Context, deps InputDeps, cfg config.Config, gc *gitct
 	var all []model.Finding
 	for i, in := range cfg.Inputs {
 		out := outcomes[i]
+		kind := model.InputKindFindings
+		if !deps.Registry.ProducesFindings(in.Format) {
+			kind = model.InputKindMetrics
+		}
 		st := model.InputStatus{
-			Name: in.Name, Format: in.Format, Status: model.InputOK,
+			Name: in.Name, Format: in.Format, Kind: kind, Status: model.InputOK,
 			Findings: len(out.findings), Metrics: len(out.metrics),
 			Warnings: append([]string{}, out.warnings...),
 		}

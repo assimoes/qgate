@@ -7,10 +7,10 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
-	"maps"
+	"path"
 	"regexp"
-	"slices"
 	"strconv"
+	"strings"
 
 	"qgate/internal/config"
 	"qgate/internal/gitctx"
@@ -31,6 +31,7 @@ func (Ingestor) Format() string { return "cobertura" }
 func (Ingestor) ProducesFindings() bool { return false }
 
 type report struct {
+	Sources  []string `xml:"sources>source"`
 	Packages []struct {
 		Classes []struct {
 			Filename string `xml:"filename,attr"`
@@ -49,17 +50,19 @@ type line struct {
 // conditionCoverage reads "50% (1/2)".
 var conditionCoverage = regexp.MustCompile(`\((\d+)/(\d+)\)`)
 
-// Parse reads every class's lines.
-func (Ingestor) Parse(_ context.Context, r io.Reader, _ config.Input, gc *gitctx.Context) (ingest.Result, error) {
+// Parse reads every class's lines. Filenames are relative to the report's
+// <source> directories, so each joined path is a candidate, then the bare
+// filename.
+func (Ingestor) Parse(ctx context.Context, r io.Reader, _ config.Input, gc *gitctx.Context) (ingest.Result, error) {
 	var rep report
 	if err := xml.NewDecoder(r).Decode(&rep); err != nil {
 		return ingest.Result{}, fmt.Errorf("decode cobertura: %w", err)
 	}
-	byPath := map[string]*coverage.File{}
-	var res ingest.Result
+	files := coverage.Files{}
+	var warnings []string
 	for _, pkg := range rep.Packages {
 		for _, cls := range pkg.Classes {
-			f := coverage.NewFile(cls.Filename)
+			f := coverage.NewFile(candidates(rep.Sources, cls.Filename)...)
 			for _, l := range cls.Lines {
 				if l.Number <= 0 {
 					continue
@@ -70,24 +73,25 @@ func (Ingestor) Parse(_ context.Context, r io.Reader, _ config.Input, gc *gitctx
 				}
 				m := conditionCoverage.FindStringSubmatch(l.ConditionCoverage)
 				if m == nil {
-					res.Warnings = append(res.Warnings, fmt.Sprintf("%s:%d: unreadable condition-coverage %q", cls.Filename, l.Number, l.ConditionCoverage))
+					warnings = append(warnings, fmt.Sprintf("%s:%d: unreadable condition-coverage %q", cls.Filename, l.Number, l.ConditionCoverage))
 					continue
 				}
 				covered, _ := strconv.Atoi(m[1])
 				total, _ := strconv.Atoi(m[2])
 				f.Branches[l.Number] = coverage.Branches{Covered: covered, Total: total}
 			}
-			if prev, ok := byPath[cls.Filename]; ok {
-				prev.Merge(f)
-			} else {
-				byPath[cls.Filename] = &f
-			}
+			files.Add(f)
 		}
 	}
-	files := make([]coverage.File, 0, len(byPath))
-	for _, p := range slices.Sorted(maps.Keys(byPath)) {
-		files = append(files, *byPath[p])
+	return files.Result(ctx, gc, warnings)
+}
+
+func candidates(sources []string, filename string) []string {
+	var out []string
+	for _, s := range sources {
+		if s = strings.TrimSpace(s); s != "" && !path.IsAbs(filename) {
+			out = append(out, path.Join(strings.ReplaceAll(s, `\`, "/"), filename))
+		}
 	}
-	res.Metrics = coverage.Metrics(files, gc)
-	return res, nil
+	return append(out, filename)
 }

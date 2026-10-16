@@ -4,7 +4,7 @@
 
 **Blocked by:** 06 (Scores, gate checks, enforcement and score --report)
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 - [x] Cobertura and LCOV produce `coverage.line` and `coverage.branch` at `repo` metric scope and at `diff` metric scope computed from changed ranges
 - [x] JUnit produces `tests.total`, `tests.failed`, `tests.skipped`

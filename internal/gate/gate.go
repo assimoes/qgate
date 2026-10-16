@@ -113,7 +113,7 @@ func maxNew(prefix string, limits map[model.Severity]int, findings []model.Findi
 }
 
 // defaultMetricScope applies to metric gate checks that name no scope.
-const defaultMetricScope = "repo"
+const defaultMetricScope = model.MetricScopeRepo
 
 // metricChecks evaluates metric gate checks in config order. Each is named
 // metrics.<name>@<scope>, with #2, #3… when the same metric is checked more
@@ -127,7 +127,7 @@ func metricChecks(checks []config.MetricCheck, metrics []model.Metric) []model.G
 		if scope == "" {
 			scope = defaultMetricScope
 		}
-		name := "metrics." + mc.Name + "@" + scope
+		name := "metrics." + mc.Name + "@" + string(scope)
 		seen[name]++
 		if n := seen[name]; n > 1 {
 			name += "#" + strconv.Itoa(n)
@@ -162,8 +162,10 @@ func compare(actual float64, op string, want float64) bool {
 		return actual < want
 	case "==":
 		return actual == want
-	default: // "!="
+	case "!=":
 		return actual != want
+	default: // the schema admits no other operator
+		return false
 	}
 }
 

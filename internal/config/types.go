@@ -60,11 +60,11 @@ type Gate struct {
 
 // MetricCheck is a gate check on a metric.
 type MetricCheck struct {
-	Name     string  `json:"name"`
-	Scope    string  `json:"scope"`
-	Op       string  `json:"op"`
-	Value    float64 `json:"value"`
-	Optional bool    `json:"optional"`
+	Name     string            `json:"name"`
+	Scope    model.MetricScope `json:"scope"`
+	Op       string            `json:"op"`
+	Value    float64           `json:"value"`
+	Optional bool              `json:"optional"`
 }
 
 // Project selects which files qgate considers.

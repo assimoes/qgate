@@ -29,12 +29,12 @@ type Evidence struct {
 }
 
 // Decide scores the findings and evaluates the gate. It is a pure function
-// of its arguments, so `qgate run` and `qgate score --report` reach the
-// same decision from the same evidence and config. producesFindings says
-// which input formats report findings rather than only metrics.
-func Decide(ev Evidence, cfg config.Config, producesFindings func(format string) bool) (Decision, error) {
+// of the evidence and config, both of which a report records, so `qgate
+// run` and `qgate score --report` reach the same decision whatever formats
+// the re-scoring build knows.
+func Decide(ev Evidence, cfg config.Config) (Decision, error) {
 	params := scoreParams(cfg.Scoring)
-	scores, err := score.Score(ev.Findings, params, assessed(cfg.Inputs, ev.Inputs, ev.Findings, producesFindings))
+	scores, err := score.Score(ev.Findings, params, assessed(cfg.Inputs, ev.Inputs, ev.Findings))
 	if err != nil {
 		return Decision{}, fmt.Errorf("score: %w", err)
 	}
@@ -72,20 +72,21 @@ func scoreParams(s config.Scoring) score.Params {
 // and the categories of the findings it produced. A metrics-only input
 // assesses only what it declares. A failed input assesses nothing, so a
 // missing analyzer never yields a perfect score.
-func assessed(cfgInputs []config.Input, statuses []model.InputStatus, findings []model.Finding,
-	producesFindings func(string) bool) []model.Category {
+func assessed(cfgInputs []config.Input, statuses []model.InputStatus, findings []model.Finding) []model.Category {
 	ok := map[string]bool{}
+	findingsInput := map[string]bool{}
 	for _, s := range statuses {
 		if s.Status == model.InputOK {
 			ok[s.Name] = true
 		}
+		findingsInput[s.Name] = s.Kind != model.InputKindMetrics
 	}
 	set := map[model.Category]bool{}
 	for _, in := range cfgInputs {
 		if !ok[in.Name] {
 			continue
 		}
-		if in.CategoryDefault != "" || producesFindings(in.Format) {
+		if in.CategoryDefault != "" || findingsInput[in.Name] {
 			set[in.EffectiveCategory()] = true
 		}
 		for _, c := range in.Assesses {

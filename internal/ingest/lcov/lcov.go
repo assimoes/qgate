@@ -6,8 +6,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"maps"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -31,10 +29,10 @@ func (Ingestor) ProducesFindings() bool { return false }
 
 // Parse reads SF/DA/BRDA records; the summary lines (LF, LH, BRF, BRH) are
 // ignored in favour of the per-line data they summarize.
-func (Ingestor) Parse(_ context.Context, r io.Reader, _ config.Input, gc *gitctx.Context) (ingest.Result, error) {
-	byPath := map[string]*coverage.File{}
+func (Ingestor) Parse(ctx context.Context, r io.Reader, _ config.Input, gc *gitctx.Context) (ingest.Result, error) {
+	files := coverage.Files{}
 	var cur *coverage.File
-	var res ingest.Result
+	var warnings []string
 	sc := bufio.NewScanner(r)
 	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	for n := 1; sc.Scan(); n++ {
@@ -42,24 +40,21 @@ func (Ingestor) Parse(_ context.Context, r io.Reader, _ config.Input, gc *gitctx
 		key, val, _ := strings.Cut(text, ":")
 		switch key {
 		case "SF":
-			if f, ok := byPath[val]; ok {
-				cur = f
-			} else {
-				f := coverage.NewFile(val)
-				byPath[val] = &f
-				cur = &f
-			}
+			cur = coverage.NewFile(val)
 		case "end_of_record":
+			if cur != nil {
+				files.Add(cur)
+			}
 			cur = nil
 		case "DA", "BRDA":
 			if cur == nil {
-				res.Warnings = append(res.Warnings, fmt.Sprintf("line %d: %s outside a file record", n, key))
+				warnings = append(warnings, fmt.Sprintf("line %d: %s outside a file record", n, key))
 				continue
 			}
 			fields := strings.Split(val, ",")
 			lineNo, err := strconv.Atoi(fields[0])
 			if err != nil || lineNo <= 0 {
-				res.Warnings = append(res.Warnings, fmt.Sprintf("line %d: invalid %s record %q", n, key, val))
+				warnings = append(warnings, fmt.Sprintf("line %d: invalid %s record %q", n, key, val))
 				continue
 			}
 			if key == "DA" && len(fields) >= 2 {
@@ -79,10 +74,8 @@ func (Ingestor) Parse(_ context.Context, r io.Reader, _ config.Input, gc *gitctx
 	if err := sc.Err(); err != nil {
 		return ingest.Result{}, fmt.Errorf("read lcov: %w", err)
 	}
-	files := make([]coverage.File, 0, len(byPath))
-	for _, p := range slices.Sorted(maps.Keys(byPath)) {
-		files = append(files, *byPath[p])
+	if cur != nil { // a final record without end_of_record
+		files.Add(cur)
 	}
-	res.Metrics = coverage.Metrics(files, gc)
-	return res, nil
+	return files.Result(ctx, gc, warnings)
 }
