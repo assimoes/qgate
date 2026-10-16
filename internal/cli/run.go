@@ -77,6 +77,7 @@ func (a app) runPipeline(ctx context.Context, started time.Time, res *config.Res
 			Registry:   a.inv.Ingestors,
 			Dir:        a.inv.Dir,
 			Env:        a.inv.Env,
+			Today:      started,
 			Workspaces: gc.Workspaces,
 		}, cfg, gc)
 		if err != nil {
@@ -126,6 +127,7 @@ func (a app) runPipeline(ctx context.Context, started time.Time, res *config.Res
 		Scores:         decision.Scores,
 		Gate:           decision.Gate,
 		DataEgress:     []model.Egress{},
+		Warnings:       nonNilStrings(inputs.Warnings),
 	}
 	if gc != nil {
 		r.Run.BaseSHA, r.Run.HeadSHA = gc.BaseSHA, gc.HeadSHA
@@ -160,6 +162,13 @@ func gateError(e model.Enforcement, o model.Outcome) error {
 		return errGateFailed
 	}
 	return nil
+}
+
+func nonNilStrings(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
 }
 
 // newRunID returns a random RFC 4122 version 4 UUID.

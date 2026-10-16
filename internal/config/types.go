@@ -224,12 +224,15 @@ type ReviewRule struct {
 	Agents      []string       `json:"agents"`
 }
 
+// ExpiryLayout is how suppressions write their expiry date (UTC).
+const ExpiryLayout = "2006-01-02"
+
 // Suppression excuses findings matching a rule and path, with a reason.
 type Suppression struct {
 	Rule    string   `json:"rule"`
 	Paths   []string `json:"paths"`
 	Reason  string   `json:"reason"`
-	Expires string   `json:"expires"` // YYYY-MM-DD
+	Expires string   `json:"expires"` // ExpiryLayout; valid through that day
 }
 
 // Baseline points at a baseline file.

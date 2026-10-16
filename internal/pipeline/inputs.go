@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 
@@ -24,6 +25,7 @@ type InputDeps struct {
 	Registry   *ingest.Registry
 	Dir        string            // repo root; input paths and commands resolve against it
 	Env        map[string]string // qgate's environment; commands get a minimal subset
+	Today      time.Time         // the run's date, for suppression expiry
 	Workspaces []string          // absolute prefixes analyzers may put on paths
 }
 
@@ -32,6 +34,7 @@ type InputsResult struct {
 	Findings []model.Finding // deduplicated, in canonical order
 	Metrics  []model.Metric
 	Statuses []model.InputStatus // in config order
+	Warnings []string            // about the run as a whole, such as expired suppressions
 }
 
 // RunInputs reads and normalizes every configured input concurrently. A
@@ -82,9 +85,10 @@ func RunInputs(ctx context.Context, deps InputDeps, cfg config.Config, gc *gitct
 		res.Metrics = append(res.Metrics, out.metrics...)
 		res.Statuses = append(res.Statuses, st)
 	}
-	// Tool dedup is the last excusal step (design §9 step 9). When the
-	// baseline and suppression steps arrive (tickets 10, 36, 37) they run
-	// on all before this call.
+	// Excusal across inputs, in design §9 order: suppressions (step 8),
+	// then tool dedup (step 9), so a suppressed finding never merges with
+	// a live one. The baseline (step 7, ticket 36) goes before them.
+	all, res.Warnings = normalize.Suppress(all, cfg.Suppressions, deps.Today)
 	res.Findings = normalize.DedupTools(all)
 	slices.SortStableFunc(res.Metrics, model.CompareMetrics)
 	return res, nil

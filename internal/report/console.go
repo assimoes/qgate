@@ -38,6 +38,9 @@ func (c Console) Report(_ context.Context, r *model.Report) error {
 		}
 	}
 	fmt.Fprintf(&b, "Findings: %d (%d new)\n", len(r.Findings), countNew(r.Findings))
+	for _, w := range r.Warnings {
+		fmt.Fprintf(&b, "Warning: %s\n", w)
+	}
 	if c.ReproducedFrom != "" {
 		fmt.Fprintf(&b, "Scores and gate reproduced exactly from %s\n", c.ReproducedFrom)
 	}

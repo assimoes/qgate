@@ -211625,3 +211625,8 @@ o## 2026-10-16 — Run-mode inputs and input failure policy
 - Before stderr is quoted anywhere, the values of the command's allowlisted variables (4 characters or longer) are replaced with `[REDACTED:<NAME>]`, so a command echoing its credentials does not put them in the report. The full secret redactor arrives with ticket 23.
 - A failed input that is `required`, or any failed input under `on_input_error: fail`, makes the run exit 3 after every report is written; the error names the inputs, sorted. This takes precedence over a failed blocking gate (exit 1), since the gate was decided on incomplete evidence. Otherwise the run is degraded and only the categories no successful input assessed become not assessed. `score --report` applies the same policy to a saved report, so it exits 3 too.
 
+
+## 2026-10-16 — Config suppressions
+
+- Suppressions run as design §9 step 8 on every tool finding that is new, out of scope or baselined, after gating scope and before tool dedup, so a suppressed finding never merges with a live one. A suppression covers a finding when its `rule` glob matches the namespaced rule ID (`golangci:lll`) and, if it lists `paths`, one of them matches the path; without `paths` it covers every path. The first covering suppression's `reason` becomes the finding's `status_note`.
+- `expires` is a date, valid through that day in UTC; a later run ignores the suppression and says so in the report's new top-level `warnings` list and on the console. An impossible date such as `2027-02-30` is a config error. The CLI passes the run's date in, so the step is a pure function, and `score --report` needs no date: suppression is already recorded in each finding's status.

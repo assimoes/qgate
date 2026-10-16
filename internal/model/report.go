@@ -61,6 +61,9 @@ type Report struct {
 	Scores         Scores          `json:"scores"`
 	Gate           GateResult      `json:"gate"`
 	DataEgress     []Egress        `json:"data_egress"`
+	// Warnings are about the run as a whole, such as expired
+	// suppressions; warnings about one input are in its status.
+	Warnings []string `json:"warnings"`
 }
 
 // Run is the report's run metadata.

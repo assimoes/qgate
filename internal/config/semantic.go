@@ -3,6 +3,7 @@ package config
 import (
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/bmatcuk/doublestar/v4"
 
@@ -45,6 +46,7 @@ func checkSemantics(doc map[string]any, blame blame) Errors {
 	c := checker{doc: doc, blame: blame}
 	c.categories()
 	c.categoryWeights()
+	c.expiryDates()
 	c.providerRefs()
 	c.agentRefs()
 	c.agentKinds()
@@ -151,6 +153,19 @@ func (c *checker) categories() {
 		}
 		for j, cat := range listAt(gate, "require_assessed") {
 			check(prof.p.key("gate").key("require_assessed").index(j), cat)
+		}
+	}
+}
+
+// expiryDates rejects suppression expiry dates that match the schema's
+// pattern but do not exist, such as 2027-02-30.
+func (c *checker) expiryDates() {
+	for i, s := range listAt(c.doc, "suppressions") {
+		m, _ := s.(map[string]any)
+		if e, ok := m["expires"].(string); ok {
+			if _, err := time.Parse(ExpiryLayout, e); err != nil {
+				c.fail(path{"suppressions"}.index(i).key("expires"), "%q is not a valid date", e)
+			}
 		}
 	}
 }
