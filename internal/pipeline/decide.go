@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 
 	"github.com/assimoes/qgate/internal/config"
 	"github.com/assimoes/qgate/internal/gate"
@@ -104,4 +105,36 @@ func assessed(cfgInputs []config.Input, statuses []model.InputStatus, findings [
 // Degraded reports whether any input failed.
 func Degraded(statuses []model.InputStatus) bool {
 	return slices.ContainsFunc(statuses, func(s model.InputStatus) bool { return s.Status == model.InputFailed })
+}
+
+// InputFailureError reports inputs whose failure is fatal: required ones,
+// or any input under on_input_error: fail. It is an infrastructure failure
+// (exit 3), decided after reports are written.
+type InputFailureError struct {
+	Inputs []string // in config order
+}
+
+func (e *InputFailureError) Error() string {
+	return fmt.Sprintf("fatal input failure: %s (required, or on_input_error: fail); see the report", strings.Join(e.Inputs, ", "))
+}
+
+// InputPolicy returns an InputFailureError when a failed input is fatal
+// under the config, else nil.
+func InputPolicy(cfg config.Config, statuses []model.InputStatus) error {
+	failed := map[string]bool{}
+	for _, s := range statuses {
+		if s.Status == model.InputFailed {
+			failed[s.Name] = true
+		}
+	}
+	var fatal []string
+	for _, in := range cfg.Inputs {
+		if failed[in.Name] && (in.Required || cfg.Profile.OnInputError == config.ErrorPolicyFail) {
+			fatal = append(fatal, in.Name)
+		}
+	}
+	if len(fatal) == 0 {
+		return nil
+	}
+	return &InputFailureError{Inputs: fatal}
 }

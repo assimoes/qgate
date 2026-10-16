@@ -96,7 +96,7 @@ func (a app) score(cmd *cobra.Command, path string) error {
 	if err := console.Report(cmd.Context(), r); err != nil {
 		a.logger.Warn("console reporter failed", "error", err)
 	}
-	return gateError(cfg.Profile.Enforcement, decision.Gate.Outcome)
+	return outcomeError(cfg, &model.Report{Run: model.Run{Enforcement: cfg.Profile.Enforcement}, Inputs: saved.Inputs, Gate: decision.Gate})
 }
 
 // checkConsistency verifies the report against itself before trusting the

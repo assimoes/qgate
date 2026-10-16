@@ -76,6 +76,7 @@ func (a app) runPipeline(ctx context.Context, started time.Time, res *config.Res
 		inputs, err = pipeline.RunInputs(ctx, pipeline.InputDeps{
 			Registry:   a.inv.Ingestors,
 			Dir:        a.inv.Dir,
+			Env:        a.inv.Env,
 			Workspaces: gc.Workspaces,
 		}, cfg, gc)
 		if err != nil {
@@ -138,6 +139,16 @@ func (a app) runPipeline(ctx context.Context, started time.Time, res *config.Res
 	// Any other reporter failing never changes the outcome.
 	if err := (report.Console{W: a.inv.Stdout}).Report(ctx, r); err != nil {
 		a.logger.Warn("console reporter failed", "error", err)
+	}
+	return outcomeError(cfg, r)
+}
+
+// outcomeError decides the exit after reports are written: a fatal input
+// failure is an infrastructure failure (exit 3) and takes precedence over
+// the gate; otherwise a failed blocking gate is exit 1.
+func outcomeError(cfg config.Config, r *model.Report) error {
+	if err := pipeline.InputPolicy(cfg, r.Inputs); err != nil {
+		return err
 	}
 	return gateError(r.Run.Enforcement, r.Gate.Outcome)
 }

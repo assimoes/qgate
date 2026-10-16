@@ -3,10 +3,9 @@
 package pipeline
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"slices"
 
 	"golang.org/x/sync/errgroup"
@@ -24,8 +23,9 @@ const maxParallelInputs = 4
 // InputDeps are what running inputs needs from the outside world.
 type InputDeps struct {
 	Registry   *ingest.Registry
-	Dir        string   // repo root; input paths resolve against it
-	Workspaces []string // absolute prefixes analyzers may put on paths
+	Dir        string            // repo root; input paths and commands resolve against it
+	Env        map[string]string // qgate's environment; commands get a minimal subset
+	Workspaces []string          // absolute prefixes analyzers may put on paths
 }
 
 // InputsResult is every input's findings, metrics and status.
@@ -99,28 +99,19 @@ type inputOutcome struct {
 }
 
 func runInput(ctx context.Context, deps InputDeps, cfg config.Config, gc *gitctx.Context, in config.Input) (inputOutcome, error) {
-	if in.Mode != "" && in.Mode != "import" {
-		return inputOutcome{}, fmt.Errorf("input mode %q is not supported in this version", in.Mode)
-	}
 	ing, ok := deps.Registry.Lookup(in.Format)
 	if !ok {
 		return inputOutcome{}, fmt.Errorf("format %q is not supported in this version", in.Format)
 	}
-
-	p := in.Path
-	if !filepath.IsAbs(p) {
-		p = filepath.Join(deps.Dir, p)
-	}
-	f, err := os.Open(p)
+	data, sourceWarnings, err := readSource(ctx, deps, in)
 	if err != nil {
-		return inputOutcome{}, fmt.Errorf("open %s: %w", in.Path, err)
+		return inputOutcome{}, err
 	}
-	defer f.Close()
-
-	raw, err := ing.Parse(ctx, f, in, gc)
+	raw, err := ing.Parse(ctx, bytes.NewReader(data), in, gc)
 	if err != nil {
-		return inputOutcome{}, fmt.Errorf("parse %s: %w", in.Path, err)
+		return inputOutcome{}, fmt.Errorf("parse %s output: %w", in.Format, err)
 	}
+	raw.Warnings = append(sourceWarnings, raw.Warnings...)
 	findings, warnings, err := normalize.ToolFindings(ctx, raw.Findings, normalize.Options{
 		Input:            in,
 		CategoryMappings: cfg.CategoryMappings,
