@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"golang.org/x/sync/errgroup"
 
@@ -82,6 +83,7 @@ func RunInputs(ctx context.Context, deps InputDeps, cfg config.Config, gc *gitct
 	// baseline and suppression steps arrive (tickets 10, 36, 37) they run
 	// on all before this call.
 	res.Findings = normalize.DedupTools(all)
+	slices.SortStableFunc(res.Metrics, model.CompareMetrics)
 	return res, nil
 }
 
@@ -127,8 +129,12 @@ func runInput(ctx context.Context, deps InputDeps, cfg config.Config, gc *gitctx
 	if err != nil {
 		return inputOutcome{}, err
 	}
+	src := model.Source{Kind: model.SourceTool, Name: in.Name}
 	for i := range findings {
 		findings[i].Source.Name = in.Name
+	}
+	for i := range raw.Metrics {
+		raw.Metrics[i].Source = src
 	}
 	return inputOutcome{findings: findings, metrics: raw.Metrics, warnings: append(raw.Warnings, warnings...)}, nil
 }

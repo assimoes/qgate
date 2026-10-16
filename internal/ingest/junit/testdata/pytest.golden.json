@@ -1,0 +1,36 @@
+{
+  "findings": null,
+  "metrics": [
+    {
+      "name": "tests.total",
+      "value": 3,
+      "unit": "count",
+      "scope": "repo",
+      "source": {
+        "kind": "",
+        "name": ""
+      }
+    },
+    {
+      "name": "tests.failed",
+      "value": 1,
+      "unit": "count",
+      "scope": "repo",
+      "source": {
+        "kind": "",
+        "name": ""
+      }
+    },
+    {
+      "name": "tests.skipped",
+      "value": 0,
+      "unit": "count",
+      "scope": "repo",
+      "source": {
+        "kind": "",
+        "name": ""
+      }
+    }
+  ],
+  "warnings": null
+}

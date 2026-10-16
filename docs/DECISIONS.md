@@ -169,3 +169,13 @@ Findings are taken strongest first (severity, then the alphabetically first inpu
 ## 2026-10-16 — Builtin severity tables are functions
 
 Each format's builtin severity mapping is a function with a switch rather than a package-level map, so there is no package state anyone could mutate.
+
+## 2026-10-16 — Coverage and test metrics
+
+- `coverage.line` and `coverage.branch` are percentages rounded to two decimals, at `repo` scope over every instrumented line or branch, and at `diff` scope over those on lines the change added or modified. Branch metrics appear only when the report has branch data (Go's cover profiles have none). A diff that touches no instrumented line has 100% diff coverage: the change left nothing uncovered, and a docs-only change must not fail a `coverage.line@diff` check.
+- Coverage tools write paths relative to the repo, absolute, or as import paths (`gocover-cobertura` writes `github.com/org/repo/pkg/file.go`). A coverage path matches a changed file when, after workspace prefixes are removed, it equals the file's path or ends with `/` and that path.
+- A file listed more than once (several Cobertura classes, repeated LCOV records) has its hits summed and its branch counts maximized. Cobertura's per-method `<lines>` repeat the class's and are ignored.
+- JUnit metrics count `<testcase>` elements at any depth under `<testsuites>` or `<testsuite>`, not the suites' attributes: a case with `<failure>` or `<error>` failed (pytest reports setup errors as `<error>`), one with `<skipped>` was skipped. They are `count` metrics at `repo` scope.
+- Metrics are reported in canonical order (name, scope, input). A metric gate check with no scope checks `repo`. When several inputs report the same metric at the same scope, the check uses the first in canonical order (alphabetical input name); config order is not recorded in the report, so this keeps `score --report` exact. Checks are named `metrics.<name>@<scope>`, with `#2`, `#3`… for repeats.
+- Metric-only formats (Cobertura, LCOV, JUnit) assess no category unless the input declares `category_default` or `assesses`; otherwise every coverage input would make `quality` assessed with a perfect score. Ingestors say which kind they are (`ProducesFindings`).
+- Seam C fixtures are hand-written in `gocover-cobertura`, coverage.py, Istanbul, go-junit-report and pytest shapes; replace them with captured output once the tools run in CI.

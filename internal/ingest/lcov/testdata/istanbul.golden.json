@@ -1,0 +1,26 @@
+{
+  "findings": null,
+  "metrics": [
+    {
+      "name": "coverage.line",
+      "value": 71.43,
+      "unit": "percent",
+      "scope": "repo",
+      "source": {
+        "kind": "",
+        "name": ""
+      }
+    },
+    {
+      "name": "coverage.branch",
+      "value": 50,
+      "unit": "percent",
+      "scope": "repo",
+      "source": {
+        "kind": "",
+        "name": ""
+      }
+    }
+  ],
+  "warnings": null
+}

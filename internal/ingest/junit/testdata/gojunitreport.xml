@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="4" failures="1" errors="0" skipped="1">
+	<testsuite name="github.com/acme/payments/internal/pay" tests="4" failures="1" errors="0" id="0" hostname="runner" skipped="1" time="0.412" timestamp="2026-10-16T10:00:00Z">
+		<properties>
+			<property name="go.version" value="go1.26.0 linux/amd64"></property>
+		</properties>
+		<testcase name="TestCharge" classname="github.com/acme/payments/internal/pay" time="0.010"></testcase>
+		<testcase name="TestCharge/zero_amount" classname="github.com/acme/payments/internal/pay" time="0.000"></testcase>
+		<testcase name="TestRefund" classname="github.com/acme/payments/internal/pay" time="0.002">
+			<failure message="Failed" type="">charge_test.go:41: refund = 0, want 100</failure>
+		</testcase>
+		<testcase name="TestSettlement" classname="github.com/acme/payments/internal/pay" time="0.000">
+			<skipped message="settlement_test.go:12: needs a database"></skipped>
+		</testcase>
+	</testsuite>
+</testsuites>

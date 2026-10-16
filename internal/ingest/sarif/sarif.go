@@ -29,6 +29,9 @@ func New() Ingestor { return Ingestor{} }
 // Format is the format name inputs use.
 func (Ingestor) Format() string { return "sarif" }
 
+// ProducesFindings is true: SARIF reports findings.
+func (Ingestor) ProducesFindings() bool { return true }
+
 // The subset of SARIF 2.1.0 qgate reads.
 type (
 	log struct {

@@ -28,6 +28,9 @@ func New() Ingestor { return Ingestor{} }
 // Format is the format name inputs use.
 func (Ingestor) Format() string { return "checkstyle" }
 
+// ProducesFindings is true: Checkstyle reports findings.
+func (Ingestor) ProducesFindings() bool { return true }
+
 type report struct {
 	Files []file `xml:"file"`
 }

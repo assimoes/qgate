@@ -17,22 +17,35 @@ type Decision struct {
 	Gate   model.GateResult
 }
 
+// Evidence is what a run observed: everything a decision depends on
+// besides the config. A saved report carries all of it.
+type Evidence struct {
+	Findings []model.Finding
+	Metrics  []model.Metric
+	Inputs   []model.InputStatus
+	// Degraded says the run was incomplete (an input or agent failed, or a
+	// budget or deadline was hit).
+	Degraded bool
+}
+
 // Decide scores the findings and evaluates the gate. It is a pure function
 // of its arguments, so `qgate run` and `qgate score --report` reach the
-// same decision from the same findings, config and input statuses.
-func Decide(findings []model.Finding, cfg config.Config, inputs []model.InputStatus, degraded bool) (Decision, error) {
+// same decision from the same evidence and config. producesFindings says
+// which input formats report findings rather than only metrics.
+func Decide(ev Evidence, cfg config.Config, producesFindings func(format string) bool) (Decision, error) {
 	params := scoreParams(cfg.Scoring)
-	scores, err := score.Score(findings, params, assessed(cfg.Inputs, inputs, findings))
+	scores, err := score.Score(ev.Findings, params, assessed(cfg.Inputs, ev.Inputs, ev.Findings, producesFindings))
 	if err != nil {
 		return Decision{}, fmt.Errorf("score: %w", err)
 	}
 	result := gate.Evaluate(gate.Input{
 		Scores:      scores,
-		Findings:    findings,
+		Findings:    ev.Findings,
+		Metrics:     ev.Metrics,
 		Gate:        cfg.Profile.Gate,
 		Enforcement: cfg.Profile.Enforcement,
 		Scoring:     params,
-		Degraded:    degraded,
+		Degraded:    ev.Degraded,
 	})
 
 	out := model.Scores{Overall: score.Points(scores.Overall), Categories: map[string]*int{}}
@@ -53,11 +66,14 @@ func scoreParams(s config.Scoring) score.Params {
 	}
 }
 
-// assessed returns the categories some successful input covered: each
-// one's declared categories (category_default, else quality, plus
-// assesses) and the categories of the findings it produced. A failed input
-// assesses nothing, so a missing analyzer never yields a perfect score.
-func assessed(cfgInputs []config.Input, statuses []model.InputStatus, findings []model.Finding) []model.Category {
+// assessed returns the categories some successful input covered: what it
+// declares (category_default and assesses; a findings input without
+// category_default assesses the default category, where its findings go)
+// and the categories of the findings it produced. A metrics-only input
+// assesses only what it declares. A failed input assesses nothing, so a
+// missing analyzer never yields a perfect score.
+func assessed(cfgInputs []config.Input, statuses []model.InputStatus, findings []model.Finding,
+	producesFindings func(string) bool) []model.Category {
 	ok := map[string]bool{}
 	for _, s := range statuses {
 		if s.Status == model.InputOK {
@@ -69,7 +85,9 @@ func assessed(cfgInputs []config.Input, statuses []model.InputStatus, findings [
 		if !ok[in.Name] {
 			continue
 		}
-		set[in.EffectiveCategory()] = true
+		if in.CategoryDefault != "" || producesFindings(in.Format) {
+			set[in.EffectiveCategory()] = true
+		}
 		for _, c := range in.Assesses {
 			set[c] = true
 		}

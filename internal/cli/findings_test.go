@@ -497,6 +497,8 @@ type blockingIngestor struct{ started chan struct{} }
 
 func (blockingIngestor) Format() string { return "sarif" }
 
+func (blockingIngestor) ProducesFindings() bool { return true }
+
 func (b blockingIngestor) Parse(ctx context.Context, _ io.Reader, _ config.Input, _ *gitctx.Context) (ingest.Result, error) {
 	b.started <- struct{}{}
 	<-ctx.Done()

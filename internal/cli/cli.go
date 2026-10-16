@@ -15,6 +15,9 @@ import (
 
 	"qgate/internal/ingest"
 	"qgate/internal/ingest/checkstyle"
+	"qgate/internal/ingest/cobertura"
+	"qgate/internal/ingest/junit"
+	"qgate/internal/ingest/lcov"
 	"qgate/internal/ingest/sarif"
 )
 
@@ -44,7 +47,7 @@ type app struct {
 
 // builtinIngestors are the analyzer report formats this build reads.
 func builtinIngestors() *ingest.Registry {
-	return ingest.NewRegistry(sarif.New(), checkstyle.New())
+	return ingest.NewRegistry(sarif.New(), checkstyle.New(), cobertura.New(), lcov.New(), junit.New())
 }
 
 // Execute runs qgate with inv and returns the process exit code.

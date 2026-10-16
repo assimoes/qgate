@@ -29,6 +29,7 @@ type savedReport struct {
 	Scoring        json.RawMessage     `json:"scoring"`
 	Inputs         []model.InputStatus `json:"inputs"`
 	Findings       []model.Finding     `json:"findings"`
+	Metrics        []model.Metric      `json:"metrics"`
 	Scores         json.RawMessage     `json:"scores"`
 	Gate           json.RawMessage     `json:"gate"`
 }
@@ -77,7 +78,9 @@ func (a app) score(cmd *cobra.Command, path string) error {
 
 	// Run health beyond input statuses (agent failures, budgets,
 	// deadlines) is a fact of the original run, recorded as gate.degraded.
-	decision, err := pipeline.Decide(saved.Findings, cfg, saved.Inputs, storedGate.Degraded)
+	decision, err := pipeline.Decide(pipeline.Evidence{
+		Findings: saved.Findings, Metrics: saved.Metrics, Inputs: saved.Inputs, Degraded: storedGate.Degraded,
+	}, cfg, a.inv.Ingestors.ProducesFindings)
 	if err != nil {
 		return fmt.Errorf("recompute decision: %w", err)
 	}

@@ -40,6 +40,9 @@ type Result struct {
 // Ingestor parses one report format.
 type Ingestor interface {
 	Format() string
+	// ProducesFindings says whether the format reports findings (and so
+	// assesses its input's category) or only metrics.
+	ProducesFindings() bool
 	Parse(ctx context.Context, r io.Reader, in config.Input, gc *gitctx.Context) (Result, error)
 }
 
@@ -61,6 +64,13 @@ func NewRegistry(ingestors ...Ingestor) *Registry {
 func (r *Registry) Lookup(format string) (Ingestor, bool) {
 	in, ok := r.byFormat[format]
 	return in, ok
+}
+
+// ProducesFindings says whether format reports findings. Unknown formats
+// are assumed to.
+func (r *Registry) ProducesFindings(format string) bool {
+	in, ok := r.byFormat[format]
+	return !ok || in.ProducesFindings()
 }
 
 // Formats lists the registered formats.

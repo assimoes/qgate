@@ -93,7 +93,10 @@ func (a app) runPipeline(ctx context.Context, started time.Time, res *config.Res
 		return fmt.Errorf("encode resolved config: %w", err)
 	}
 	hash := sha256.Sum256(resolved)
-	decision, err := pipeline.Decide(inputs.Findings, cfg, inputs.Statuses, pipeline.Degraded(inputs.Statuses))
+	decision, err := pipeline.Decide(pipeline.Evidence{
+		Findings: inputs.Findings, Metrics: inputs.Metrics,
+		Inputs: inputs.Statuses, Degraded: pipeline.Degraded(inputs.Statuses),
+	}, cfg, a.inv.Ingestors.ProducesFindings)
 	if err != nil {
 		return fmt.Errorf("decide: %w", err)
 	}

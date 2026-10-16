@@ -71,7 +71,7 @@ func DedupTools(fs []model.Finding) []model.Finding {
 	})
 
 	var groups []*group
-	var out []model.Finding
+	out := make([]model.Finding, 0, len(fs))
 	for _, f := range order {
 		if f.Source.Kind != model.SourceTool {
 			out = append(out, f)

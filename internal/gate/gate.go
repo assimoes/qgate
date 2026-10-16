@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strconv"
 
 	"qgate/internal/config"
 	"qgate/internal/model"
@@ -17,6 +18,7 @@ import (
 type Input struct {
 	Scores      score.Scores // hundredths; nil means not assessed
 	Findings    []model.Finding
+	Metrics     []model.Metric // in canonical order
 	Gate        config.Gate
 	Enforcement model.Enforcement
 	Scoring     score.Params
@@ -58,6 +60,7 @@ func Evaluate(in Input) model.GateResult {
 	checks = append(checks, maxNew("max_new_tool", g.MaxNewTool, in.Findings, func(f model.Finding) bool {
 		return f.Source.Kind == model.SourceTool
 	})...)
+	checks = append(checks, metricChecks(g.Metrics, in.Metrics)...)
 	for _, c := range slices.Sorted(slices.Values(g.RequireAssessed)) {
 		assessed := in.Scores.Categories[c] != nil
 		checks = append(checks, model.GateCheck{
@@ -107,6 +110,65 @@ func maxNew(prefix string, limits map[model.Severity]int, findings []model.Findi
 		})
 	}
 	return out
+}
+
+// defaultMetricScope applies to metric gate checks that name no scope.
+const defaultMetricScope = "repo"
+
+// metricChecks evaluates metric gate checks in config order. Each is named
+// metrics.<name>@<scope>, with #2, #3… when the same metric is checked more
+// than once. When several inputs report the same metric at the same scope,
+// the first in canonical order (alphabetical input name) is used.
+func metricChecks(checks []config.MetricCheck, metrics []model.Metric) []model.GateCheck {
+	var out []model.GateCheck
+	seen := map[string]int{}
+	for _, mc := range checks {
+		scope := mc.Scope
+		if scope == "" {
+			scope = defaultMetricScope
+		}
+		name := "metrics." + mc.Name + "@" + scope
+		seen[name]++
+		if n := seen[name]; n > 1 {
+			name += "#" + strconv.Itoa(n)
+		}
+		c := model.GateCheck{Check: name, Expected: mc.Op + " " + formatNumber(mc.Value)}
+		i := slices.IndexFunc(metrics, func(m model.Metric) bool { return m.Name == mc.Name && m.Scope == scope })
+		switch {
+		case i < 0 && mc.Optional:
+			c.Result, c.Note = model.CheckSkipped, "metric not reported; the check is optional"
+		case i < 0:
+			c.Result, c.Note = model.CheckFail, "metric not reported by any input"
+		default:
+			c.Actual = metrics[i].Value
+			c.Result = checkResult(compare(metrics[i].Value, mc.Op, mc.Value))
+		}
+		out = append(out, c)
+	}
+	return out
+}
+
+// compare applies a metric check operator; the config schema allows only
+// these six.
+func compare(actual float64, op string, want float64) bool {
+	switch op {
+	case ">=":
+		return actual >= want
+	case ">":
+		return actual > want
+	case "<=":
+		return actual <= want
+	case "<":
+		return actual < want
+	case "==":
+		return actual == want
+	default: // "!="
+		return actual != want
+	}
+}
+
+func formatNumber(v float64) string {
+	return strconv.FormatFloat(v, 'f', -1, 64)
 }
 
 func checkResult(ok bool) model.CheckResult {
