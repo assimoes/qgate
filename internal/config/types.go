@@ -129,7 +129,7 @@ type Pricing struct {
 // Input brings an analyzer's results into qgate.
 type Input struct {
 	Name            string                    `json:"name"`
-	Mode            string                    `json:"mode"`
+	Mode            InputMode                 `json:"mode"`
 	Format          string                    `json:"format"`
 	Path            string                    `json:"path"`
 	Command         []string                  `json:"command"`
@@ -152,6 +152,16 @@ func (in Input) EffectiveCategory() model.Category {
 	}
 	return model.DefaultCategory
 }
+
+// InputMode is how an input gets its analyzer's output.
+type InputMode string
+
+// Input modes.
+const (
+	InputModeImport     InputMode = "import"      // read a file written earlier (the default)
+	InputModeRun        InputMode = "run"         // run a command and read its output
+	InputModeExecPlugin InputMode = "exec_plugin" // run a plugin over the plugin protocol
+)
 
 // JSONMapping maps arbitrary JSON to findings with JSONPath expressions.
 type JSONMapping struct {

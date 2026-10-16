@@ -3,6 +3,8 @@ package cli
 import (
 	"errors"
 	"fmt"
+
+	"github.com/assimoes/qgate/internal/pipeline"
 )
 
 // Exit codes (design §4.3). Infrastructure failures must never map to
@@ -32,6 +34,7 @@ var errGateFailed = errors.New("gate failed")
 // never gate failures.
 func exitCode(err error) int {
 	var ue usageError
+	var inputErr *pipeline.InputFailureError
 	switch {
 	case err == nil:
 		return ExitOK
@@ -39,6 +42,8 @@ func exitCode(err error) int {
 		return ExitGateFailed
 	case errors.As(err, &ue):
 		return ExitUsage
+	case errors.As(err, &inputErr):
+		return ExitFatalRuntime // infrastructure: a fatal input failure
 	default:
 		return ExitFatalRuntime
 	}

@@ -3,7 +3,6 @@
 package pipeline
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"slices"
@@ -103,15 +102,19 @@ func runInput(ctx context.Context, deps InputDeps, cfg config.Config, gc *gitctx
 	if !ok {
 		return inputOutcome{}, fmt.Errorf("format %q is not supported in this version", in.Format)
 	}
-	data, sourceWarnings, err := readSource(ctx, deps, in)
+	data, err := openInput(ctx, deps, in)
 	if err != nil {
 		return inputOutcome{}, err
 	}
-	raw, err := ing.Parse(ctx, bytes.NewReader(data), in, gc)
+	defer data.Close()
+	raw, err := ing.Parse(ctx, data, in, gc)
 	if err != nil {
+		if data.stderr != "" {
+			return inputOutcome{}, fmt.Errorf("parse %s output: %w; stderr: %s", in.Format, err, data.stderr)
+		}
 		return inputOutcome{}, fmt.Errorf("parse %s output: %w", in.Format, err)
 	}
-	raw.Warnings = append(sourceWarnings, raw.Warnings...)
+	raw.Warnings = append(data.warnings, raw.Warnings...)
 	findings, warnings, err := normalize.ToolFindings(ctx, raw.Findings, normalize.Options{
 		Input:            in,
 		CategoryMappings: cfg.CategoryMappings,

@@ -111,7 +111,7 @@ func Degraded(statuses []model.InputStatus) bool {
 // or any input under on_input_error: fail. It is an infrastructure failure
 // (exit 3), decided after reports are written.
 type InputFailureError struct {
-	Inputs []string // in config order
+	Inputs []string // sorted
 }
 
 func (e *InputFailureError) Error() string {
@@ -136,5 +136,6 @@ func InputPolicy(cfg config.Config, statuses []model.InputStatus) error {
 	if len(fatal) == 0 {
 		return nil
 	}
+	slices.Sort(fatal)
 	return &InputFailureError{Inputs: fatal}
 }

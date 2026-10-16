@@ -1,20 +1,24 @@
 package cli_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/assimoes/qgate/internal/clitest"
 )
 
-// script writes an executable shell script into the repo.
-func script(t *testing.T, repo *clitest.Repo, name, body string) {
+// script writes the executable shell script scan.sh into the repo.
+func script(t *testing.T, repo *clitest.Repo, body string) {
 	t.Helper()
-	repo.Write(name, "#!/bin/sh\n"+body)
-	if err := os.Chmod(filepath.Join(repo.Dir, name), 0o755); err != nil {
+	repo.Write("scan.sh", "#!/bin/sh\n"+body)
+	if err := os.Chmod(filepath.Join(repo.Dir, "scan.sh"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -47,8 +51,8 @@ func TestRunModeInputs(t *testing.T) {
 			input: `{ name: scan, mode: run, format: sarif, command: ["./scan.sh"] }`, status: "ok", finding: true},
 		{name: "path is read after the command", script: "cp finding.sarif out.sarif\n",
 			input: `{ name: scan, mode: run, format: sarif, command: ["./scan.sh"], path: out.sarif }`, status: "ok", finding: true},
-		{name: "arguments are passed without a shell", script: "cat \"$1\"\n",
-			input: `{ name: scan, mode: run, format: sarif, command: ["./scan.sh", "finding.sarif"] }`, status: "ok", finding: true},
+		{name: "arguments are passed without a shell", script: "test \"$1\" = '$HOME *' && cat finding.sarif\n",
+			input: `{ name: scan, mode: run, format: sarif, command: ["./scan.sh", "$HOME *"] }`, status: "ok", finding: true},
 		{name: "non-zero exit with output is parsed, with a warning", script: "cat finding.sarif\nexit 1\n",
 			input: `{ name: scan, mode: run, format: sarif, command: ["./scan.sh"] }`, status: "ok", finding: true, message: "exited with status 1"},
 		{name: "non-zero exit without output fails", script: "echo boom >&2\nexit 2\n",
@@ -57,6 +61,16 @@ func TestRunModeInputs(t *testing.T) {
 			input: `{ name: scan, mode: run, format: sarif, command: ["./scan.sh"] }`, status: "failed", message: "parse"},
 		{name: "timeout fails", script: "sleep 10\n",
 			input: `{ name: scan, mode: run, format: sarif, command: ["./scan.sh"], timeout: 200ms }`, status: "failed", message: "timed out after 200ms"},
+		{name: "a command killed by a signal fails", script: "cat finding.sarif\nkill -9 $$\n",
+			input: `{ name: scan, mode: run, format: sarif, command: ["./scan.sh"] }`, status: "failed", message: "killed by signal"},
+		{name: "a stale path file fails", script: "echo crashed >&2\nexit 2\n",
+			input: `{ name: scan, mode: run, format: sarif, command: ["./scan.sh"], path: finding.sarif }`, status: "failed", message: "not written by"},
+		{name: "the real end of stderr is quoted", script: "head -c 40000 /dev/zero | tr '\\0' x >&2\necho LAST LINE >&2\nexit 2\n",
+			input: `{ name: scan, mode: run, format: sarif, command: ["./scan.sh"] }`, status: "failed", message: "LAST LINE"},
+		{name: "a parse failure quotes stderr", script: "echo 'warn: bad config' >&2\necho garbage\n",
+			input: `{ name: scan, mode: run, format: sarif, command: ["./scan.sh"] }`, status: "failed", message: "bad config"},
+		{name: "output over the cap fails", script: "head -c 270000000 /dev/zero\n",
+			input: `{ name: scan, mode: run, format: sarif, command: ["./scan.sh"] }`, status: "failed", message: "exceeds 256 MiB"},
 		{name: "a command that cannot start fails", script: "",
 			input: `{ name: scan, mode: run, format: sarif, command: ["./does-not-exist"] }`, status: "failed", message: "does-not-exist"},
 	}
@@ -65,7 +79,7 @@ func TestRunModeInputs(t *testing.T) {
 			t.Parallel()
 			repo, base, _ := history(t)
 			repo.Write("finding.sarif", oneFinding)
-			script(t, repo, "scan.sh", tt.script)
+			script(t, repo, tt.script)
 			repo.Write(".qgate.yaml", "version: 1\ninputs:\n  - "+tt.input+"\n")
 			res := clitest.Run(t, clitest.Options{Dir: repo.Dir, Env: map[string]string{"PATH": os.Getenv("PATH")}}, "run", "--base", base)
 			if res.Code != 0 {
@@ -79,7 +93,10 @@ func TestRunModeInputs(t *testing.T) {
 				t.Errorf("finding present = %v, want %v", got, tt.finding)
 			}
 			if text := fmt.Sprint(in["error"], in["warnings"]); !strings.Contains(text, tt.message) {
-				t.Errorf("error/warnings = %s, want %q", text, tt.message)
+				t.Errorf("error/warnings = %.300s, want %q", text, tt.message)
+			}
+			if e, _ := in["error"].(string); len(e) > 3000 {
+				t.Errorf("error is %d bytes; a command's stderr must be quoted as a short tail", len(e))
 			}
 		})
 	}
@@ -89,7 +106,7 @@ func TestRunModeEnvironmentIsAnAllowlist(t *testing.T) {
 	t.Parallel()
 	repo, base, _ := history(t)
 	// The script reports what it can see as the finding's message.
-	script(t, repo, "scan.sh", `printf '{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"S","rules":[{"id":"r"}]}},"results":[{"ruleId":"r","message":{"text":"allowed=%s secret=%s pwd=%s"},"locations":[{"physicalLocation":{"artifactLocation":{"uri":"a.go"},"region":{"startLine":5}}}]}]}]}' "$ALLOWED" "$SECRET" "$(pwd)"
+	script(t, repo, `printf '{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"S","rules":[{"id":"r"}]}},"results":[{"ruleId":"r","message":{"text":"allowed=%s secret=%s pwd=%s"},"locations":[{"physicalLocation":{"artifactLocation":{"uri":"a.go"},"region":{"startLine":5}}}]}]}]}' "$ALLOWED" "$SECRET" "$(pwd)"
 `)
 	repo.Write(".qgate.yaml", "version: 1\ninputs:\n  - { name: scan, mode: run, format: sarif, command: [\"./scan.sh\"], env: [ALLOWED] }\n")
 	env := map[string]string{"PATH": os.Getenv("PATH"), "ALLOWED": "yes", "SECRET": "leak"}
@@ -102,7 +119,7 @@ func TestRunModeEnvironmentIsAnAllowlist(t *testing.T) {
 	if !strings.Contains(msg, "allowed=yes") || !strings.Contains(msg, "secret= ") {
 		t.Errorf("message = %q, want the allowlisted variable only", msg)
 	}
-	if !strings.Contains(msg, "pwd="+filepath.Base(repo.Dir)) && !strings.HasSuffix(strings.TrimSpace(msg), filepath.Base(repo.Dir)) {
+	if !strings.HasSuffix(strings.TrimSpace(msg), filepath.Base(repo.Dir)) {
 		t.Errorf("message = %q, want the command to run in the repo root", msg)
 	}
 }
@@ -175,9 +192,95 @@ inputs:
 	res := clitest.Run(t, clitest.Options{Dir: repo.Dir}, "run", "--base", base)
 	cats := res.DecodeReport(t)["scores"].(map[string]any)["categories"].(map[string]any)
 	if cats["quality"] == nil {
-		t.Error("quality = null, want assessed: lint still covered it")
+		t.Error("quality = null, want assessed: lint still assessed it")
 	}
 	if cats["dependencies"] != nil {
-		t.Errorf("dependencies = %v, want null: only the failed input covered it", cats["dependencies"])
+		t.Errorf("dependencies = %v, want null: only the failed input assessed it", cats["dependencies"])
+	}
+}
+
+// processGone reports whether the process whose pid is in file has exited.
+func processGone(t *testing.T, file string) bool {
+	t.Helper()
+	data, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatalf("read pid file: %v", err)
+	}
+	pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := os.FindProcess(pid)
+	if err != nil {
+		return true
+	}
+	return p.Signal(syscall.Signal(0)) != nil
+}
+
+func TestRunModeChildProcesses(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name, script, input, status string
+	}{
+		// The command finished with complete output; its lingering child
+		// must neither fail the input nor outlive the run.
+		{"a child outliving a finished command", "cat finding.sarif\n(sleep 30) &\necho $! > child.pid\nexit 0\n",
+			`{ name: scan, mode: run, format: sarif, command: ["./scan.sh"] }`, "ok"},
+		// A timed-out command's children are killed with it.
+		{"a timed-out command's child", "(sleep 30) &\necho $! > child.pid\nsleep 30\n",
+			`{ name: scan, mode: run, format: sarif, command: ["./scan.sh"], timeout: 2s }`, "failed"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			repo, base, _ := history(t)
+			repo.Write("finding.sarif", oneFinding)
+			script(t, repo, tt.script)
+			repo.Write(".qgate.yaml", "version: 1\ninputs:\n  - "+tt.input+"\n")
+			start := time.Now()
+			res := clitest.Run(t, clitest.Options{Dir: repo.Dir, Env: map[string]string{"PATH": os.Getenv("PATH")}}, "run", "--base", base)
+			if took := time.Since(start); took > 8*time.Second {
+				t.Errorf("run took %s, want it to end without waiting for the child", took)
+			}
+			if in := inputStatus(t, res, "scan"); in["status"] != tt.status {
+				t.Errorf("status = %v, want %s; input = %v", in["status"], tt.status, in)
+			}
+			if !processGone(t, filepath.Join(repo.Dir, "child.pid")) {
+				t.Error("the command's child process is still running")
+			}
+		})
+	}
+}
+
+func TestCommandStderrIsRedacted(t *testing.T) {
+	t.Parallel()
+	repo, base, _ := history(t)
+	script(t, repo, "echo \"auth failed token=$LINT_TOKEN\" >&2\nexit 2\n")
+	repo.Write(".qgate.yaml", "version: 1\ninputs:\n  - { name: scan, mode: run, format: sarif, command: [\"./scan.sh\"], env: [LINT_TOKEN] }\n")
+	env := map[string]string{"PATH": os.Getenv("PATH"), "LINT_TOKEN": "ghp_supersecret123"}
+	res := clitest.Run(t, clitest.Options{Dir: repo.Dir, Env: env}, "run", "--base", base)
+	msg := fmt.Sprint(inputStatus(t, res, "scan")["error"])
+	if strings.Contains(string(res.Report)+res.Stdout+res.Stderr, "ghp_supersecret123") {
+		t.Errorf("the token reached the output; error = %s", msg)
+	}
+	if !strings.Contains(msg, "[REDACTED:LINT_TOKEN]") {
+		t.Errorf("error = %s, want the token replaced by [REDACTED:LINT_TOKEN]", msg)
+	}
+}
+
+// The run's deadline reaches the user through more than one path (the
+// input step and the report writer both notice it), so this guards the
+// outcome, exit 3 naming the deadline, rather than one code path.
+func TestRunDeadlineIsNotReportedAsTheInputsTimeout(t *testing.T) {
+	t.Parallel()
+	repo, base, _ := history(t)
+	script(t, repo, "sleep 30\n")
+	repo.Write(".qgate.yaml", "version: 1\ninputs:\n  - { name: scan, mode: run, format: sarif, command: [\"./scan.sh\"], timeout: 60s }\n")
+	// The whole run's deadline expires long before the input's own timeout.
+	ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+	defer cancel()
+	res := clitest.Run(t, clitest.Options{Dir: repo.Dir, Context: ctx, Env: map[string]string{"PATH": os.Getenv("PATH")}}, "run", "--base", base)
+	if res.Code != 3 || !strings.Contains(res.Stderr, "deadline exceeded") || strings.Contains(res.Stderr, "timed out after 1m0s") {
+		t.Errorf("exit code = %d, want 3 naming the run's deadline; stderr:\n%s", res.Code, res.Stderr)
 	}
 }

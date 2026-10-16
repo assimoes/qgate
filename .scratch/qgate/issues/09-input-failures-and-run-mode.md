@@ -14,7 +14,7 @@
 
 ## Demo
 
-Build the binary once from the repo root: `go build -o /tmp/qgate ./cmd/qgate`. Then paste the script below (it needs `git` and `jq`). Two stand-in analyzers are commands qgate runs itself: `lint.sh` finds a double charge and, like golangci-lint, exits 1 when it does; `slow.sh` hangs.
+Build the binary once from the repo root: `go build -o /tmp/qgate ./cmd/qgate`. Then paste the script below (it needs `git` and `jq`). Two stand-in analyzers are commands qgate runs itself: `lint.sh` finds a double charge and, like golangci-lint, exits 1 when it does; `slow.sh` hangs like a stuck dependency analyzer.
 
 ```bash
 # 1. A repo with a change, and a stand-in "analyzer" script that, like
@@ -44,12 +44,12 @@ EOF
 export LINT_TOKEN=tok-123 AWS_SECRET=hunter2
 
 # 2. qgate runs both commands itself: lint's exit 1 still yields its finding,
-#    the slow scanner times out, and the run is degraded but not failed
+#    the slow analyzer times out, and the run is degraded but not failed
 echo "== 2"; /tmp/qgate run --base $BASE; echo "exit=$?"
 # 3. What each input did, and what the lint command could see
 echo "== 3"; jq -c '.inputs[] | {name, status, warnings, error}' qgate-report.json
 jq -r '.findings[0].message' qgate-report.json
-# 4. Mark the slow scanner required: the same run now exits 3, after writing the report
+# 4. Mark the slow analyzer required: the same run now exits 3, after writing the report
 echo "== 4"; sed -i.bak 's/timeout: 2s,/timeout: 2s, required: true,/' .qgate.yaml
 /tmp/qgate run --base $BASE > /dev/null; echo "exit=$?"; jq -c '.gate | {outcome, degraded}' qgate-report.json
 # 5. Re-gating the saved report reaches the same exit code
@@ -58,7 +58,7 @@ echo "== 5"; cp qgate-report.json saved.json; /tmp/qgate score --report saved.js
 
 What to point out:
 
-1. **Step 2:** qgate runs both commands itself. Lint's exit status 1 does not lose its finding; the hung scanner is killed after its 2-second timeout. The run is degraded, so the blocking gate warns instead of passing silently, and exits 0 because the failed input is optional.
+1. **Step 2:** qgate runs both commands itself. Lint's exit status 1 does not lose its finding; the hung analyzer is killed after its 2-second timeout. The run is degraded, so the blocking gate warns instead of passing silently, and exits 0 because the failed input is optional.
 2. **Step 3:** each input's outcome is in the report: lint ok with a warning about its exit status, deps failed with the reason. The lint command saw `LINT_TOKEN`, which its `env` allowlist names, but not `AWS_SECRET` from the same shell.
-3. **Step 4:** once the scanner is `required`, the same failure is fatal: exit 3, an infrastructure failure, never 1. The report is still written, so CI can upload it.
+3. **Step 4:** once the analyzer is `required`, the same failure is fatal: exit 3, an infrastructure failure, never 1. The report is still written, so CI can upload it.
 4. **Step 5:** re-gating the saved report reaches the same exit 3 without running anything.
