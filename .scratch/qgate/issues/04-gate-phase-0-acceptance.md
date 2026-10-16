@@ -4,12 +4,12 @@
 
 **Blocked by:** 01 (Walking skeleton), 02 (Repo config and profiles), 03 (Org config and locked keys)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] `qgate validate --stage staging` prints the resolved reference config; invalid configs error with file, path and message
 - [x] Locked-key violations and `extends` cycles exit 2
 - [x] `qgate run` with no inputs writes a valid report and exits 0
-- [ ] `go vet`, `staticcheck` and `go test -race` are green in CI
+- [x] `go vet`, `staticcheck` and `go test -race` are green in CI
 
 ## Verification (2026-10-16, at 15ce3f4)
 
@@ -20,4 +20,4 @@ Run against a fresh clone of `HEAD` and the binary built from it.
 - `qgate run` in an empty directory exits 0, prints `Gate outcome: PASS` and writes `qgate-report.json`. Schema validity of the report is asserted by the Seam A tests.
 - Every step of `.github/workflows/ci.yml` passes on the clean clone: gofmt, `go vet`, staticcheck 2025.1.1, `go test -race`, `CGO_ENABLED=0` build. Tests also pass under Go 1.25.0, the version `go.mod` declares and CI installs, and the binary cross-builds for linux/amd64.
 
-**Open:** "green in CI" cannot be shown until the repository has a remote that runs the workflow. Phase 1 may start on the local evidence above; tick the last box after the first CI run on the remote.
+**CI:** the first run on `github.com/assimoes/qgate` (run 38922188088, commit 5bcceff, 2026-10-16) passed `scripts/check.sh`, which runs gofmt, vet and staticcheck through golangci-lint, and `go test -race`.
