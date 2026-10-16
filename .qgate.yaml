@@ -1,0 +1,23 @@
+# qgate gates its own changes: the self-gate job in .github/workflows/ci.yml
+# lints, tests and measures coverage, then runs `qgate run --stage ci` on
+# the reports below.
+version: 1
+
+project:
+  exclude: ["**/testdata/**"]
+
+inputs:
+  - { name: golangci, format: sarif, path: reports/golangci.sarif, required: true }
+  - { name: coverage, format: cobertura, path: reports/coverage.xml, required: true }
+  - { name: tests, format: junit, path: reports/junit.xml, required: true }
+
+profiles:
+  ci:
+    enforcement: blocking
+    gate:
+      max_new: { critical: 0, high: 0 }
+      require_assessed: [quality]
+      metrics:
+        - { name: tests.failed, op: "==", value: 0 }
+        - { name: coverage.line, scope: repo, op: ">=", value: 80 }
+        - { name: coverage.line, scope: diff, op: ">=", value: 70 }
