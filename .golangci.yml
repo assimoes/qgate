@@ -1,0 +1,23 @@
+version: "2"
+
+linters:
+  # The defaults (errcheck, govet, ineffassign, staticcheck, unused) plus
+  # checks for mistakes reviews kept finding by hand.
+  enable:
+    - errorlint # %v instead of %w; errors compared or asserted without errors.Is/As
+    - nilerr    # returning nil while an error is in hand
+    - revive    # doc comments on exported identifiers
+    - unparam   # parameters and results that never vary
+  settings:
+    revive:
+      rules:
+        - name: exported
+          arguments: ["disableStutteringCheck"]
+  exclusions:
+    presets:
+      - std-error-handling # unchecked Close, fmt.Fprint* to writers, os.Remove in cleanup
+
+formatters:
+  enable:
+    - gofmt
+    - goimports

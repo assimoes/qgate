@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -126,8 +127,12 @@ func instancePath(doc any, tokens []string) path {
 	for _, tok := range tokens {
 		switch t := cur.(type) {
 		case []any:
-			var i int
-			fmt.Sscanf(tok, "%d", &i)
+			i, err := strconv.Atoi(tok)
+			if err != nil { // a pointer into a list is always an index
+				p = p.key(tok)
+				cur = nil
+				continue
+			}
 			p = p.index(i)
 			if i >= 0 && i < len(t) {
 				cur = t[i]

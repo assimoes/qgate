@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Runs the full check before every commit. Enable once per clone with:
+#   git config core.hooksPath .githooks
+exec "$(git rev-parse --show-toplevel)/scripts/check.sh"

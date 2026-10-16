@@ -15,13 +15,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: gofmt
-        run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
-      - name: go vet
-        run: go vet ./...
-      - name: staticcheck
-        run: go run honnef.co/go/tools/cmd/staticcheck@2025.1.1 ./...
-      - name: test
-        run: go test -race ./...
+      - name: check
+        run: scripts/check.sh
       - name: build
         run: CGO_ENABLED=0 go build ./cmd/qgate
