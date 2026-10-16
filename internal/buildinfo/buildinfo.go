@@ -5,7 +5,7 @@ package buildinfo
 import "runtime/debug"
 
 // Set at build time, e.g.
-// -ldflags "-X qgate/internal/buildinfo.version=0.1.0 -X qgate/internal/buildinfo.commit=abc123 -X qgate/internal/buildinfo.date=2026-10-15T00:00:00Z".
+// -ldflags "-X github.com/assimoes/qgate/internal/buildinfo.version=0.1.0 -X github.com/assimoes/qgate/internal/buildinfo.commit=abc123 -X github.com/assimoes/qgate/internal/buildinfo.date=2026-10-15T00:00:00Z".
 // These are written only by the linker and never mutated at run time.
 var (
 	version = "dev"

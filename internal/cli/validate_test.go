@@ -8,7 +8,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"qgate/internal/clitest"
+	"github.com/assimoes/qgate/internal/clitest"
 )
 
 // referenceEnv is what the reference config needs to interpolate.

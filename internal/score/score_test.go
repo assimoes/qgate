@@ -9,8 +9,8 @@ import (
 	"slices"
 	"testing"
 
-	"qgate/internal/model"
-	"qgate/internal/score"
+	"github.com/assimoes/qgate/internal/model"
+	"github.com/assimoes/qgate/internal/score"
 )
 
 // referenceParams are the scoring parameters of the design's reference

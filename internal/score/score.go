@@ -9,7 +9,7 @@ import (
 	"maps"
 	"slices"
 
-	"qgate/internal/model"
+	"github.com/assimoes/qgate/internal/model"
 )
 
 // AlgorithmVersion is the latest scoring algorithm this build implements.

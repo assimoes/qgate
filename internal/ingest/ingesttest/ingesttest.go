@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"qgate/internal/config"
-	"qgate/internal/ingest"
+	"github.com/assimoes/qgate/internal/config"
+	"github.com/assimoes/qgate/internal/ingest"
 )
 
 var update = flag.Bool("update", false, "rewrite golden files")

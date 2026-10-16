@@ -1,4 +1,4 @@
-module qgate
+module github.com/assimoes/qgate
 
 go 1.26.0
 

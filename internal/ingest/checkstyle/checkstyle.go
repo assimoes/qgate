@@ -9,10 +9,10 @@ import (
 	"io"
 	"strconv"
 
-	"qgate/internal/config"
-	"qgate/internal/gitctx"
-	"qgate/internal/ingest"
-	"qgate/internal/model"
+	"github.com/assimoes/qgate/internal/config"
+	"github.com/assimoes/qgate/internal/gitctx"
+	"github.com/assimoes/qgate/internal/ingest"
+	"github.com/assimoes/qgate/internal/model"
 )
 
 // unnamedRule is the rule ID for errors without a source, such as ESLint's

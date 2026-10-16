@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"qgate/internal/clitest"
+	"github.com/assimoes/qgate/internal/clitest"
 )
 
 const orgConfig = `version: 1

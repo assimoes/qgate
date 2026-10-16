@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"qgate/internal/clitest"
-	"qgate/internal/config"
-	"qgate/internal/gitctx"
-	"qgate/internal/ingest"
+	"github.com/assimoes/qgate/internal/clitest"
+	"github.com/assimoes/qgate/internal/config"
+	"github.com/assimoes/qgate/internal/gitctx"
+	"github.com/assimoes/qgate/internal/ingest"
 )
 
 // sarifResult is one result in a hand-built SARIF log.

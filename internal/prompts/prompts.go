@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"qgate/internal/model"
+	"github.com/assimoes/qgate/internal/model"
 )
 
 // BuiltinScheme prefixes references to builtin prompts.

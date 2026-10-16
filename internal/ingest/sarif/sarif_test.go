@@ -3,8 +3,8 @@ package sarif_test
 import (
 	"testing"
 
-	"qgate/internal/ingest/ingesttest"
-	"qgate/internal/ingest/sarif"
+	"github.com/assimoes/qgate/internal/ingest/ingesttest"
+	"github.com/assimoes/qgate/internal/ingest/sarif"
 )
 
 // The fixtures follow each analyzer's SARIF output shape (Semgrep OSS,

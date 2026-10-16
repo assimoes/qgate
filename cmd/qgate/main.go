@@ -10,7 +10,7 @@ import (
 	"strings"
 	"syscall"
 
-	"qgate/internal/cli"
+	"github.com/assimoes/qgate/internal/cli"
 )
 
 func main() {

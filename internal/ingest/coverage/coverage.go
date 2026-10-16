@@ -11,9 +11,9 @@ import (
 	"slices"
 	"strings"
 
-	"qgate/internal/gitctx"
-	"qgate/internal/ingest"
-	"qgate/internal/model"
+	"github.com/assimoes/qgate/internal/gitctx"
+	"github.com/assimoes/qgate/internal/ingest"
+	"github.com/assimoes/qgate/internal/model"
 )
 
 // Metric names.

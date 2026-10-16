@@ -13,8 +13,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"qgate/internal/cli"
-	"qgate/internal/ingest"
+	"github.com/assimoes/qgate/internal/cli"
+	"github.com/assimoes/qgate/internal/ingest"
 )
 
 // Result is what one CLI invocation produced.

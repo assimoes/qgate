@@ -13,12 +13,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"qgate/internal/buildinfo"
-	"qgate/internal/config"
-	"qgate/internal/gitctx"
-	"qgate/internal/model"
-	"qgate/internal/pipeline"
-	"qgate/internal/report"
+	"github.com/assimoes/qgate/internal/buildinfo"
+	"github.com/assimoes/qgate/internal/config"
+	"github.com/assimoes/qgate/internal/gitctx"
+	"github.com/assimoes/qgate/internal/model"
+	"github.com/assimoes/qgate/internal/pipeline"
+	"github.com/assimoes/qgate/internal/report"
 )
 
 // DefaultReportPath is where `qgate run` writes the JSON report when no

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"qgate/internal/clitest"
+	"github.com/assimoes/qgate/internal/clitest"
 )
 
 // checkstyleXML builds a Checkstyle report; paths are written as given.

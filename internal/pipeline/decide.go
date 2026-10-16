@@ -5,10 +5,10 @@ import (
 	"maps"
 	"slices"
 
-	"qgate/internal/config"
-	"qgate/internal/gate"
-	"qgate/internal/model"
-	"qgate/internal/score"
+	"github.com/assimoes/qgate/internal/config"
+	"github.com/assimoes/qgate/internal/gate"
+	"github.com/assimoes/qgate/internal/model"
+	"github.com/assimoes/qgate/internal/score"
 )
 
 // Decision is the deterministic part of a run: scores and the gate.

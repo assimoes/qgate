@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"qgate/internal/clitest"
+	"github.com/assimoes/qgate/internal/clitest"
 )
 
 // gateRepo is a history with one new high finding in security and one in

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"qgate/internal/clitest"
+	"github.com/assimoes/qgate/internal/clitest"
 )
 
 func TestVersionPrintsBuildAndScoringInfo(t *testing.T) {

@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"qgate/internal/model"
+	"github.com/assimoes/qgate/internal/model"
 )
 
 // JSON writes the canonical JSON report to a file.

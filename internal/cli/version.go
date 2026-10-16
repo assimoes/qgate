@@ -5,8 +5,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"qgate/internal/buildinfo"
-	"qgate/internal/score"
+	"github.com/assimoes/qgate/internal/buildinfo"
+	"github.com/assimoes/qgate/internal/score"
 )
 
 func (a app) newVersionCommand() *cobra.Command {

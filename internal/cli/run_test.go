@@ -9,8 +9,8 @@ import (
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
-	"qgate/internal/clitest"
-	"qgate/schemas"
+	"github.com/assimoes/qgate/internal/clitest"
+	"github.com/assimoes/qgate/schemas"
 )
 
 func TestRunWithNoInputsWritesValidReportAndPasses(t *testing.T) {

@@ -2,9 +2,9 @@
 
 Small "simplest reasonable choice" decisions made during implementation (design §1). Architectural decisions go in `docs/adr/` instead.
 
-## 2026-10-15 — Module path is `qgate`
+## 2026-10-15 — Module path
 
-The repository has no remote yet, so the Go module path is the bare name `qgate`. Rename to the hosting path (e.g. `github.com/<org>/qgate`) once a remote exists; it is a mechanical import rewrite.
+The module path was the bare name `qgate` while the repository had no remote; since 2026-10-16 it is `github.com/assimoes/qgate`, the remote's path.
 
 ## 2026-10-15 — Default JSON report path
 

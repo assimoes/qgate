@@ -3,8 +3,8 @@ package cobertura_test
 import (
 	"testing"
 
-	"qgate/internal/ingest/cobertura"
-	"qgate/internal/ingest/ingesttest"
+	"github.com/assimoes/qgate/internal/ingest/cobertura"
+	"github.com/assimoes/qgate/internal/ingest/ingesttest"
 )
 
 // Fixtures follow gocover-cobertura (Go import paths, no branch data) and

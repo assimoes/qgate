@@ -9,9 +9,9 @@ import (
 	"slices"
 	"strconv"
 
-	"qgate/internal/config"
-	"qgate/internal/model"
-	"qgate/internal/score"
+	"github.com/assimoes/qgate/internal/config"
+	"github.com/assimoes/qgate/internal/model"
+	"github.com/assimoes/qgate/internal/score"
 )
 
 // Input is everything a gate decision depends on.

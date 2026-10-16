@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"qgate/internal/model"
+	"github.com/assimoes/qgate/internal/model"
 )
 
 // dedupKey is one way two findings can be the same issue: the same

@@ -13,12 +13,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"qgate/internal/ingest"
-	"qgate/internal/ingest/checkstyle"
-	"qgate/internal/ingest/cobertura"
-	"qgate/internal/ingest/junit"
-	"qgate/internal/ingest/lcov"
-	"qgate/internal/ingest/sarif"
+	"github.com/assimoes/qgate/internal/ingest"
+	"github.com/assimoes/qgate/internal/ingest/checkstyle"
+	"github.com/assimoes/qgate/internal/ingest/cobertura"
+	"github.com/assimoes/qgate/internal/ingest/junit"
+	"github.com/assimoes/qgate/internal/ingest/lcov"
+	"github.com/assimoes/qgate/internal/ingest/sarif"
 )
 
 // Invocation is everything a qgate process receives from its environment.

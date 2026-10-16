@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"qgate/internal/clitest"
-	"qgate/internal/ingest"
+	"github.com/assimoes/qgate/internal/clitest"
+	"github.com/assimoes/qgate/internal/ingest"
 )
 
 // a.go has 10 lines; history changes line 5. The coverage reports below

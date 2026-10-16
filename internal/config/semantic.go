@@ -6,8 +6,8 @@ import (
 
 	"github.com/bmatcuk/doublestar/v4"
 
-	"qgate/internal/model"
-	"qgate/internal/prompts"
+	"github.com/assimoes/qgate/internal/model"
+	"github.com/assimoes/qgate/internal/prompts"
 )
 
 // builtinCategories are always known; custom categories must be declared in

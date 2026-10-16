@@ -3,8 +3,8 @@ package lcov_test
 import (
 	"testing"
 
-	"qgate/internal/ingest/ingesttest"
-	"qgate/internal/ingest/lcov"
+	"github.com/assimoes/qgate/internal/ingest/ingesttest"
+	"github.com/assimoes/qgate/internal/ingest/lcov"
 )
 
 // The fixture follows Istanbul/nyc's lcov reporter (absolute paths,

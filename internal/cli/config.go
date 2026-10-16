@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"qgate/internal/config"
+	"github.com/assimoes/qgate/internal/config"
 )
 
 const defaultStage = "dev"

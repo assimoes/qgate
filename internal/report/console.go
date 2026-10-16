@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"qgate/internal/model"
+	"github.com/assimoes/qgate/internal/model"
 )
 
 // Console writes the human summary to a terminal or CI log, gate outcome first.

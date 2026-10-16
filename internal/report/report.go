@@ -5,7 +5,7 @@ package report
 import (
 	"context"
 
-	"qgate/internal/model"
+	"github.com/assimoes/qgate/internal/model"
 )
 
 // Reporter renders a report to one destination.

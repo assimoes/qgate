@@ -11,11 +11,11 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"qgate/internal/config"
-	"qgate/internal/gitctx"
-	"qgate/internal/ingest"
-	"qgate/internal/model"
-	"qgate/internal/normalize"
+	"github.com/assimoes/qgate/internal/config"
+	"github.com/assimoes/qgate/internal/gitctx"
+	"github.com/assimoes/qgate/internal/ingest"
+	"github.com/assimoes/qgate/internal/model"
+	"github.com/assimoes/qgate/internal/normalize"
 )
 
 // maxParallelInputs bounds how many inputs are read and parsed at once.

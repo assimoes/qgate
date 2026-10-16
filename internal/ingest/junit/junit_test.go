@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"qgate/internal/config"
-	"qgate/internal/ingest/ingesttest"
-	"qgate/internal/ingest/junit"
+	"github.com/assimoes/qgate/internal/config"
+	"github.com/assimoes/qgate/internal/ingest/ingesttest"
+	"github.com/assimoes/qgate/internal/ingest/junit"
 )
 
 // Fixtures follow go-junit-report (subtests as test cases, skipped

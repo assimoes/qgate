@@ -13,10 +13,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"qgate/internal/config"
-	"qgate/internal/model"
-	"qgate/internal/pipeline"
-	"qgate/internal/report"
+	"github.com/assimoes/qgate/internal/config"
+	"github.com/assimoes/qgate/internal/model"
+	"github.com/assimoes/qgate/internal/pipeline"
+	"github.com/assimoes/qgate/internal/report"
 )
 
 // savedReport is a report as `score --report` reads it: the inputs to the

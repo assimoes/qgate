@@ -15,7 +15,7 @@ import (
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 
-	"qgate/schemas"
+	"github.com/assimoes/qgate/schemas"
 )
 
 const configSchemaURL = "config.schema.json"

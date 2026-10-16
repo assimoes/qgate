@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"qgate/internal/model"
+	"github.com/assimoes/qgate/internal/model"
 )
 
 // Config is the resolved configuration for one run: every layer merged, the

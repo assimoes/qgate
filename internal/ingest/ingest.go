@@ -9,9 +9,9 @@ import (
 	"maps"
 	"slices"
 
-	"qgate/internal/config"
-	"qgate/internal/gitctx"
-	"qgate/internal/model"
+	"github.com/assimoes/qgate/internal/config"
+	"github.com/assimoes/qgate/internal/gitctx"
+	"github.com/assimoes/qgate/internal/model"
 )
 
 // Finding is a finding as an ingestor read it, before normalization.

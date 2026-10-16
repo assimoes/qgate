@@ -4,10 +4,10 @@ import (
 	"strings"
 	"testing"
 
-	"qgate/internal/config"
-	"qgate/internal/gate"
-	"qgate/internal/model"
-	"qgate/internal/score"
+	"github.com/assimoes/qgate/internal/config"
+	"github.com/assimoes/qgate/internal/gate"
+	"github.com/assimoes/qgate/internal/model"
+	"github.com/assimoes/qgate/internal/score"
 )
 
 func h(v int) *int { return &v }

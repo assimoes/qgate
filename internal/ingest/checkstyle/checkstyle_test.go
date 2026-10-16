@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"qgate/internal/config"
-	"qgate/internal/ingest/checkstyle"
-	"qgate/internal/ingest/ingesttest"
+	"github.com/assimoes/qgate/internal/config"
+	"github.com/assimoes/qgate/internal/ingest/checkstyle"
+	"github.com/assimoes/qgate/internal/ingest/ingesttest"
 )
 
 // The fixtures follow golangci-lint's and ESLint's checkstyle output (ESLint
