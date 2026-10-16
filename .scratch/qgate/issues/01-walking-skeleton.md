@@ -6,9 +6,9 @@
 
 **Status:** resolved
 
-- [ ] `qgate run` with no inputs writes a JSON report that validates against the report schema and exits 0
-- [ ] `qgate run` prints a warning that only builtin policy is active when no repo config exists
-- [ ] `qgate version` prints version, commit, build date and scoring algorithm version
-- [ ] Exit codes 0/1/2/3 are defined in one place and an unknown command or flag exits 2
-- [ ] A Seam A test helper invokes the CLI in-process and captures exit code, stdout, stderr and the written report
-- [ ] CI runs `go vet`, `staticcheck` and `go test -race` and is green
+- [x] `qgate run` with no inputs writes a JSON report that validates against the report schema and exits 0
+- [x] `qgate run` prints a warning that only builtin policy is active when no repo config exists
+- [x] `qgate version` prints version, commit, build date and scoring algorithm version
+- [x] Exit codes 0/1/2/3 are defined in one place and an unknown command or flag exits 2
+- [x] A Seam A test helper invokes the CLI in-process and captures exit code, stdout, stderr and the written report
+- [x] CI runs `go vet`, `staticcheck` and `go test -race` and is green

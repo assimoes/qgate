@@ -102,9 +102,9 @@ An org config URL may carry credentials in its user info or query string. Everyw
 
 Design §9 step 3 applies an input's `severity_map` before the format's builtin mapping, so the ingestor cannot settle severity itself. `ingest.Finding` carries the analyzer's label (`raw_severity`), the format's builtin mapping for that finding (`default_severity`, e.g. SARIF `security-severity` when present, else its `level`) and the analyzer's own fingerprint. Design §8.2 is updated to match.
 
-## 2026-10-16 — SARIF goldens use fixtures in each analyzer's shape
+## 2026-10-16 — Seam C fixtures are captured analyzer output
 
-Semgrep, CodeQL and Trivy are not installed where ticket 05 was built, so the Seam C fixtures are written by hand in each tool's real SARIF shape (Semgrep's matchBasedId fingerprints and CWE-prefixed tags, CodeQL's rules in query-pack `extensions` referenced through `rule.toolComponent.index`, Trivy's ROOTPATH base and severity tags). Replace them with captured output, and regenerate the goldens with `-update`, the first time the analyzers run in CI.
+`scripts/capture-fixtures.sh` runs the real tools, each in a pinned Docker image, against the sample project in `testdata/capture/` (Go, JavaScript and Python with planted issues) and writes their output into the ingestors' `testdata/`: Semgrep, CodeQL (the Go bundle, emulated as linux/amd64) and Trivy SARIF; golangci-lint and ESLint Checkstyle; gocover-cobertura and coverage.py Cobertura; c8 LCOV; go-junit-report and pytest JUnit. After a capture, `go test ./internal/ingest/... -update` regenerates the goldens, and the diff shows what changed in the tools' output. Capturing the first time corrected three assumptions the earlier hand-written fixtures had made: gocover-cobertura writes paths relative to `<source>`, not import paths; Trivy's ROOTPATH is the scanned directory, not `file:///`; and CodeQL 2.27 lists its rules in the driver again rather than in query-pack extensions (the ingestor reads both).
 
 ## 2026-10-16 — Git context only when inputs exist
 
@@ -150,7 +150,7 @@ At least one `scoring.category_weights` entry must be positive (exit 2 otherwise
 
 ## 2026-10-16 — Checkstyle ingestion
 
-A `<error>`'s `source` attribute is its rule ID (`errcheck` for golangci-lint, `eslint.rules.no-console` for ESLint) and also its title, since Checkstyle has no separate title. Errors without a source, such as ESLint parse errors, get rule ID `unnamed` and a warning. The builtin severity mapping is `error`→high, `warning`→medium, `info`→low, `ignore`→info; an input's `severity_map` applies first. A missing or invalid `line` means file-level. As with SARIF, the Seam C fixtures are hand-written in golangci-lint's and ESLint's output shapes because the linters are not installed; replace them with captured output and run `go test ./internal/ingest/checkstyle -update`.
+A `<error>`'s `source` attribute is its rule ID (`errcheck` for golangci-lint, `eslint.rules.no-console` for ESLint) and also its title, since Checkstyle has no separate title. Errors without a source, such as ESLint parse errors, get rule ID `unnamed` and a warning. The builtin severity mapping is `error`→high, `warning`→medium, `info`→low, `ignore`→info; an input's `severity_map` applies first. A missing or invalid `line` means file-level.
 
 ## 2026-10-16 — Category mappings match namespaced rule IDs
 
@@ -178,4 +178,3 @@ Each format's builtin severity mapping is a function with a switch rather than a
 - JUnit metrics count `<testcase>` elements at any depth under `<testsuites>` or `<testsuite>`, not the suites' attributes: a case with `<failure>` or `<error>` failed (pytest reports setup errors as `<error>`), one with `<skipped>` was skipped. They are `count` metrics at `repo` scope.
 - Metrics are reported in canonical order (name, scope, input). A metric gate check with no scope checks `repo`. When several inputs report the same metric at the same scope, the check uses the first in canonical order (alphabetical input name); config order is not recorded in the report, so this keeps `score --report` exact. Checks are named `metrics.<name>@<scope>`, with `#2`, `#3`… for repeats.
 - Metric-only formats (Cobertura, LCOV, JUnit) assess no category unless the input declares `category_default` or `assesses`; otherwise every coverage input would make `quality` assessed with a perfect score. Ingestors say which kind they are (`ProducesFindings`, added to the `Ingestor` contract as a prefactor for this ticket), and each input's report entry records it as `kind: findings | metrics`, so `score --report` assesses from the report, not from the formats the re-scoring build happens to know.
-- Seam C fixtures are hand-written in `gocover-cobertura`, coverage.py, Istanbul, go-junit-report and pytest shapes; replace them with captured output once the tools run in CI.

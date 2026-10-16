@@ -4,16 +4,13 @@
 
 **Blocked by:** 06 (Scores, gate checks, enforcement and score --report)
 
-**Status:** ready-for-human
+**Status:** resolved
 
 - [x] Cobertura and LCOV produce `coverage.line` and `coverage.branch` at `repo` metric scope and at `diff` metric scope computed from changed ranges
 - [x] JUnit produces `tests.total`, `tests.failed`, `tests.skipped`
 - [x] `metrics[]` gate checks support all six operators and fail on a missing metric unless `optional: true`
-- [ ] Seam C golden tests cover real Cobertura, LCOV and JUnit output
+- [x] Seam C golden tests cover real Cobertura, LCOV and JUnit output
 
-## Open
-
-- The Seam C goldens run against hand-written fixtures in each tool's output shape. Replace `internal/ingest/{cobertura,lcov,junit}/testdata/*` with captured output and run `go test ./internal/ingest/... -update`, then tick the last box.
 
 ## Demo
 

@@ -1,16 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites tests="4" failures="1" errors="0" skipped="1">
-	<testsuite name="github.com/acme/payments/internal/pay" tests="4" failures="1" errors="0" id="0" hostname="runner" skipped="1" time="0.412" timestamp="2026-10-16T10:00:00Z">
+<testsuites tests="6" failures="1" skipped="1">
+	<testsuite name="example.com/sample" tests="6" failures="1" errors="0" id="0" hostname="5b8dcddeaa99" skipped="1" time="0.006" timestamp="2026-10-16T15:30:53Z">
 		<properties>
-			<property name="go.version" value="go1.26.0 linux/amd64"></property>
+			<property name="coverage.statements.pct" value="41.20"></property>
 		</properties>
-		<testcase name="TestCharge" classname="github.com/acme/payments/internal/pay" time="0.010"></testcase>
-		<testcase name="TestCharge/zero_amount" classname="github.com/acme/payments/internal/pay" time="0.000"></testcase>
-		<testcase name="TestRefund" classname="github.com/acme/payments/internal/pay" time="0.002">
-			<failure message="Failed" type="">charge_test.go:41: refund = 0, want 100</failure>
+		<testcase name="TestGrade" classname="example.com/sample" time="0.000"></testcase>
+		<testcase name="TestGrade/A" classname="example.com/sample" time="0.000"></testcase>
+		<testcase name="TestGrade/B" classname="example.com/sample" time="0.000"></testcase>
+		<testcase name="TestGrade/F" classname="example.com/sample" time="0.000"></testcase>
+		<testcase name="TestGradeBoundary" classname="example.com/sample" time="0.000">
+			<failure message="Failed"><![CDATA[    store_test.go:18: Grade(90) = B, want A]]></failure>
 		</testcase>
-		<testcase name="TestSettlement" classname="github.com/acme/payments/internal/pay" time="0.000">
-			<skipped message="settlement_test.go:12: needs a database"></skipped>
+		<testcase name="TestFindUser" classname="example.com/sample" time="0.000">
+			<skipped message="Skipped"><![CDATA[    store_test.go:23: needs a database]]></skipped>
 		</testcase>
+		<system-out><![CDATA[go: downloading golang.org/x/net v0.20.0]]></system-out>
 	</testsuite>
 </testsuites>

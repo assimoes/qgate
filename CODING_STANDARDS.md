@@ -56,7 +56,7 @@ Concurrency lives only in input and agent fan-out and in provider calls.
 
 - **Every test can fail.** For each new or changed test, name the code change that would turn it red. A test that passes whether or not the feature works (it re-encodes instead of tampering, it stops on an earlier error, it compares a result with itself) is a finding.
 - Tests drive behavior through the seams of design §16: the in-process CLI (`clitest`), `score.Score` and `gate.Evaluate`, and `Ingestor.Parse` with golden files (`ingesttest`). Unexported helpers are tested through them.
-- Fixtures for external formats are captured analyzer output. A hand-written fixture is labelled as such in the test and leaves its ticket `ready-for-human` until real output replaces it.
+- Fixtures for external formats are real tool output, captured by `scripts/capture-fixtures.sh` from `testdata/capture/`. A new format or tool adds a capture step and a planted issue there, not a hand-written fixture.
 - Tests are hermetic: `t.TempDir()`, `t.Setenv()`, fixture git repos from `clitest.NewRepo`, injected HTTP clients; never the real home directory, network or global state.
 
 ## Tickets

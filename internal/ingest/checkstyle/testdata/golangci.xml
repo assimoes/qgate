@@ -1,11 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <checkstyle version="5.0">
-  <file name="internal/pay/charge.go">
-    <error column="12" line="48" message="Error return value of `tx.Rollback` is not checked" severity="error" source="errcheck"></error>
-    <error column="1" line="52" message="cyclomatic complexity 34 of func `(*Service).Charge` is high (&gt; 30)" severity="error" source="gocyclo"></error>
-  </file>
-  <file name="internal/pay/refund.go">
-    <error column="2" line="17" message="ineffectual assignment to err" severity="warning" source="ineffassign"></error>
+  <file name="store.go">
+    <error column="13" line="22" message="Error return value of `tx.Rollback` is not checked" severity="error" source="errcheck"></error>
+    <error column="1" line="35" message="cyclomatic complexity 5 of func `Grade` is high (&gt; 4)" severity="warning" source="gocyclo"></error>
   </file>
 </checkstyle>

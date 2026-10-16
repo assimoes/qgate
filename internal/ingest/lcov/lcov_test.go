@@ -7,10 +7,9 @@ import (
 	"github.com/assimoes/qgate/internal/ingest/lcov"
 )
 
-// The fixture follows Istanbul/nyc's lcov reporter (absolute paths,
-// function and branch records, "-" for branches never reached). Replace it
-// with captured output when the tool runs in CI; see docs/DECISIONS.md.
+// The fixture is real c8 (Istanbul lcov reporter) output for
+// testdata/capture/, captured by scripts/capture-fixtures.sh.
 func TestParseGolden(t *testing.T) {
 	t.Parallel()
-	ingesttest.Golden(t, lcov.New(), "istanbul.info")
+	ingesttest.Golden(t, lcov.New(), "c8.info")
 }

@@ -1,0 +1,18 @@
+rules:
+  - id: go-sql-from-sprintf
+    languages: [go]
+    severity: ERROR
+    message: SQL query built with fmt.Sprintf from user input; use a parameterized query.
+    metadata:
+      cwe: ["CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')"]
+      category: security
+    patterns:
+      - pattern-inside: |
+          $Q := fmt.Sprintf($FMT, ...)
+          ...
+      - pattern: $DB.Query($Q)
+  - id: js-console-log
+    languages: [javascript]
+    severity: WARNING
+    message: Remove console.log before shipping.
+    pattern: console.log(...)

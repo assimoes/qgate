@@ -2,17 +2,17 @@
   "findings": [
     {
       "fingerprint": "",
-      "rule_id": "python.lang.security.audit.formatted-sql-query.formatted-sql-query",
+      "rule_id": "go-sql-from-sprintf",
       "category": "",
       "severity": "info",
-      "title": "Semgrep Finding: python.lang.security.audit.formatted-sql-query.formatted-sql-query",
-      "message": "Detected string formatting used to build a SQL query. Use parameterized queries instead.",
+      "title": "Semgrep Finding: go-sql-from-sprintf",
+      "message": "SQL query built with fmt.Sprintf from user input; use a parameterized query.",
       "location": {
-        "path": "app/db.py",
-        "start_line": 14,
-        "end_line": 14,
-        "start_col": 5,
-        "end_col": 62
+        "path": "go/store.go",
+        "start_line": 17,
+        "end_line": 17,
+        "start_col": 9,
+        "end_col": 24
       },
       "cwe": [
         "CWE-89"
@@ -25,25 +25,22 @@
       "status": "",
       "raw_severity": "error",
       "default_severity": "high",
-      "tool_fingerprint": "matchBasedId/v1=3f1e0c9a7b2d6e54a8c1f0e9d7b6a5c4e3d2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6"
+      "tool_fingerprint": "matchBasedId/v1=eef3bd5ade0071e42c13573a423fd3fbbdecb581d48132fb609e146992fcf730674c0e8fa8f4331bc39d5ac257e18900c092ee95fabd8f7ee20c8140518f9ac1_0"
     },
     {
       "fingerprint": "",
-      "rule_id": "python.flask.security.audit.debug-enabled.debug-enabled",
+      "rule_id": "js-console-log",
       "category": "",
       "severity": "info",
-      "title": "Semgrep Finding: python.flask.security.audit.debug-enabled.debug-enabled",
-      "message": "Debug mode is enabled in a Flask app.",
+      "title": "Semgrep Finding: js-console-log",
+      "message": "Remove console.log before shipping.",
       "location": {
-        "path": "app/views.py",
-        "start_line": 40,
-        "end_line": 41,
-        "start_col": 9,
-        "end_col": 30
+        "path": "js/cart.js",
+        "start_line": 8,
+        "end_line": 8,
+        "start_col": 3,
+        "end_col": 28
       },
-      "cwe": [
-        "CWE-489"
-      ],
       "source": {
         "kind": "tool",
         "name": "",
@@ -52,7 +49,7 @@
       "status": "",
       "raw_severity": "warning",
       "default_severity": "medium",
-      "tool_fingerprint": "matchBasedId/v1=9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6d"
+      "tool_fingerprint": "matchBasedId/v1=5d89283dd51a98d32e85c28bacaea4519ec78fd629dacbe0540b6cb65e806769f578798ae5372a6b94a93d54b315f01507d576ab4a1f0d4572c01fe64cfe8514_0"
     }
   ],
   "metrics": null,

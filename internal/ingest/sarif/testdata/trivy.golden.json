@@ -6,11 +6,11 @@
       "category": "",
       "severity": "info",
       "title": "golang: net/http, x/net/http2: unlimited number of CONTINUATION frames causes DoS",
-      "message": "Package: golang.org/x/net\nInstalled Version: v0.20.0\nVulnerability CVE-2023-45288\nSeverity: HIGH\nFixed Version: 0.23.0",
+      "message": "Package: golang.org/x/net\nInstalled Version: 0.20.0\nVulnerability CVE-2023-45288\nSeverity: HIGH\nFixed Version: 0.23.0\nLink: [CVE-2023-45288](https://avd.aquasec.com/nvd/cve-2023-45288)",
       "location": {
-        "path": "go.mod",
-        "start_line": 12,
-        "end_line": 12,
+        "path": "/src/go.mod",
+        "start_line": 1,
+        "end_line": 1,
         "start_col": 1,
         "end_col": 1
       },
@@ -25,13 +25,13 @@
     },
     {
       "fingerprint": "",
-      "rule_id": "CVE-2024-24790",
+      "rule_id": "CVE-2024-45338",
       "category": "",
       "severity": "info",
-      "title": "golang: net/netip: Unexpected behavior from Is methods for IPv4-mapped IPv6 addresses",
-      "message": "Package: stdlib\nInstalled Version: v1.22.1\nVulnerability CVE-2024-24790\nSeverity: CRITICAL\nFixed Version: 1.21.11, 1.22.4",
+      "title": "golang.org/x/net/html: Non-linear parsing of case-insensitive content in golang.org/x/net/html",
+      "message": "Package: golang.org/x/net\nInstalled Version: 0.20.0\nVulnerability CVE-2024-45338\nSeverity: HIGH\nFixed Version: 0.33.0\nLink: [CVE-2024-45338](https://avd.aquasec.com/nvd/cve-2024-45338)",
       "location": {
-        "path": "bin/server",
+        "path": "/src/go.mod",
         "start_line": 1,
         "end_line": 1,
         "start_col": 1,
@@ -44,7 +44,398 @@
       },
       "status": "",
       "raw_severity": "error",
-      "default_severity": "critical"
+      "default_severity": "high"
+    },
+    {
+      "fingerprint": "",
+      "rule_id": "CVE-2026-25681",
+      "category": "",
+      "severity": "info",
+      "title": "golang.org/x/net/html: golang.org/x/net/html: Arbitrary code execution via Cross-Site Scripting",
+      "message": "Package: golang.org/x/net\nInstalled Version: 0.20.0\nVulnerability CVE-2026-25681\nSeverity: HIGH\nFixed Version: 0.55.0\nLink: [CVE-2026-25681](https://avd.aquasec.com/nvd/cve-2026-25681)",
+      "location": {
+        "path": "/src/go.mod",
+        "start_line": 1,
+        "end_line": 1,
+        "start_col": 1,
+        "end_col": 1
+      },
+      "source": {
+        "kind": "tool",
+        "name": "",
+        "version": "0.56.2"
+      },
+      "status": "",
+      "raw_severity": "error",
+      "default_severity": "high"
+    },
+    {
+      "fingerprint": "",
+      "rule_id": "CVE-2026-27136",
+      "category": "",
+      "severity": "info",
+      "title": "golang.org/x/net/html: golang: golang.org/x/net/html: Cross-Site Scripting via HTML parsing bypass",
+      "message": "Package: golang.org/x/net\nInstalled Version: 0.20.0\nVulnerability CVE-2026-27136\nSeverity: HIGH\nFixed Version: 0.55.0\nLink: [CVE-2026-27136](https://avd.aquasec.com/nvd/cve-2026-27136)",
+      "location": {
+        "path": "/src/go.mod",
+        "start_line": 1,
+        "end_line": 1,
+        "start_col": 1,
+        "end_col": 1
+      },
+      "source": {
+        "kind": "tool",
+        "name": "",
+        "version": "0.56.2"
+      },
+      "status": "",
+      "raw_severity": "error",
+      "default_severity": "high"
+    },
+    {
+      "fingerprint": "",
+      "rule_id": "CVE-2026-33814",
+      "category": "",
+      "severity": "info",
+      "title": "net/http/internal/http2: golang: golang.org/x/net: Go HTTP/2: Denial of Service via malformed SETTINGS_MAX_FRAME_SIZE frame",
+      "message": "Package: golang.org/x/net\nInstalled Version: 0.20.0\nVulnerability CVE-2026-33814\nSeverity: HIGH\nFixed Version: 0.53.0\nLink: [CVE-2026-33814](https://avd.aquasec.com/nvd/cve-2026-33814)",
+      "location": {
+        "path": "/src/go.mod",
+        "start_line": 1,
+        "end_line": 1,
+        "start_col": 1,
+        "end_col": 1
+      },
+      "source": {
+        "kind": "tool",
+        "name": "",
+        "version": "0.56.2"
+      },
+      "status": "",
+      "raw_severity": "error",
+      "default_severity": "high"
+    },
+    {
+      "fingerprint": "",
+      "rule_id": "CVE-2026-39821",
+      "category": "",
+      "severity": "info",
+      "title": "golang.org/x/net/idna: golang: net/http: golang.org/x/net/idna: Privilege escalation via incorrect Punycode label processing",
+      "message": "Package: golang.org/x/net\nInstalled Version: 0.20.0\nVulnerability CVE-2026-39821\nSeverity: HIGH\nFixed Version: 0.55.0\nLink: [CVE-2026-39821](https://avd.aquasec.com/nvd/cve-2026-39821)",
+      "location": {
+        "path": "/src/go.mod",
+        "start_line": 1,
+        "end_line": 1,
+        "start_col": 1,
+        "end_col": 1
+      },
+      "source": {
+        "kind": "tool",
+        "name": "",
+        "version": "0.56.2"
+      },
+      "status": "",
+      "raw_severity": "error",
+      "default_severity": "high"
+    },
+    {
+      "fingerprint": "",
+      "rule_id": "CVE-2026-46600",
+      "category": "",
+      "severity": "info",
+      "title": "golang.org/x/net/dns/dnsmessage: golang.org/x/net/dns/dnsmessage: Denial of Service via invalid DNS record parsing",
+      "message": "Package: golang.org/x/net\nInstalled Version: 0.20.0\nVulnerability CVE-2026-46600\nSeverity: HIGH\nFixed Version: 0.56.0\nLink: [CVE-2026-46600](https://avd.aquasec.com/nvd/cve-2026-46600)",
+      "location": {
+        "path": "/src/go.mod",
+        "start_line": 1,
+        "end_line": 1,
+        "start_col": 1,
+        "end_col": 1
+      },
+      "source": {
+        "kind": "tool",
+        "name": "",
+        "version": "0.56.2"
+      },
+      "status": "",
+      "raw_severity": "error",
+      "default_severity": "high"
+    },
+    {
+      "fingerprint": "",
+      "rule_id": "CVE-2026-78669",
+      "category": "",
+      "severity": "info",
+      "title": "net/http: net/http/internal/http2: golang.org/x/net/http2: net/http: Denial of Service via excessive HTTP/2 SETTINGS frames",
+      "message": "Package: golang.org/x/net\nInstalled Version: 0.20.0\nVulnerability CVE-2026-78669\nSeverity: HIGH\nFixed Version: 0.60.0\nLink: [CVE-2026-78669](https://avd.aquasec.com/nvd/cve-2026-78669)",
+      "location": {
+        "path": "/src/go.mod",
+        "start_line": 1,
+        "end_line": 1,
+        "start_col": 1,
+        "end_col": 1
+      },
+      "source": {
+        "kind": "tool",
+        "name": "",
+        "version": "0.56.2"
+      },
+      "status": "",
+      "raw_severity": "error",
+      "default_severity": "high"
+    },
+    {
+      "fingerprint": "",
+      "rule_id": "CVE-2025-22870",
+      "category": "",
+      "severity": "info",
+      "title": "golang.org/x/net/proxy: golang.org/x/net/http/httpproxy: HTTP Proxy bypass using IPv6 Zone IDs in golang.org/x/net",
+      "message": "Package: golang.org/x/net\nInstalled Version: 0.20.0\nVulnerability CVE-2025-22870\nSeverity: MEDIUM\nFixed Version: 0.36.0\nLink: [CVE-2025-22870](https://avd.aquasec.com/nvd/cve-2025-22870)",
+      "location": {
+        "path": "/src/go.mod",
+        "start_line": 1,
+        "end_line": 1,
+        "start_col": 1,
+        "end_col": 1
+      },
+      "source": {
+        "kind": "tool",
+        "name": "",
+        "version": "0.56.2"
+      },
+      "status": "",
+      "raw_severity": "warning",
+      "default_severity": "medium"
+    },
+    {
+      "fingerprint": "",
+      "rule_id": "CVE-2025-22872",
+      "category": "",
+      "severity": "info",
+      "title": "golang.org/x/net/html: Incorrect Neutralization of Input During Web Page Generation in x/net in golang.org/x/net",
+      "message": "Package: golang.org/x/net\nInstalled Version: 0.20.0\nVulnerability CVE-2025-22872\nSeverity: MEDIUM\nFixed Version: 0.38.0\nLink: [CVE-2025-22872](https://avd.aquasec.com/nvd/cve-2025-22872)",
+      "location": {
+        "path": "/src/go.mod",
+        "start_line": 1,
+        "end_line": 1,
+        "start_col": 1,
+        "end_col": 1
+      },
+      "source": {
+        "kind": "tool",
+        "name": "",
+        "version": "0.56.2"
+      },
+      "status": "",
+      "raw_severity": "warning",
+      "default_severity": "medium"
+    },
+    {
+      "fingerprint": "",
+      "rule_id": "CVE-2025-47911",
+      "category": "",
+      "severity": "info",
+      "title": "golang.org/x/net/html: Quadratic parsing complexity in golang.org/x/net/html",
+      "message": "Package: golang.org/x/net\nInstalled Version: 0.20.0\nVulnerability CVE-2025-47911\nSeverity: MEDIUM\nFixed Version: 0.45.0\nLink: [CVE-2025-47911](https://avd.aquasec.com/nvd/cve-2025-47911)",
+      "location": {
+        "path": "/src/go.mod",
+        "start_line": 1,
+        "end_line": 1,
+        "start_col": 1,
+        "end_col": 1
+      },
+      "source": {
+        "kind": "tool",
+        "name": "",
+        "version": "0.56.2"
+      },
+      "status": "",
+      "raw_severity": "warning",
+      "default_severity": "medium"
+    },
+    {
+      "fingerprint": "",
+      "rule_id": "CVE-2025-58190",
+      "category": "",
+      "severity": "info",
+      "title": "golang.org/x/net/html: Infinite parsing loop in golang.org/x/net",
+      "message": "Package: golang.org/x/net\nInstalled Version: 0.20.0\nVulnerability CVE-2025-58190\nSeverity: MEDIUM\nFixed Version: 0.45.0\nLink: [CVE-2025-58190](https://avd.aquasec.com/nvd/cve-2025-58190)",
+      "location": {
+        "path": "/src/go.mod",
+        "start_line": 1,
+        "end_line": 1,
+        "start_col": 1,
+        "end_col": 1
+      },
+      "source": {
+        "kind": "tool",
+        "name": "",
+        "version": "0.56.2"
+      },
+      "status": "",
+      "raw_severity": "warning",
+      "default_severity": "medium"
+    },
+    {
+      "fingerprint": "",
+      "rule_id": "CVE-2026-25680",
+      "category": "",
+      "severity": "info",
+      "title": "golang.org/x/net/html: golang.org/x/net/html: Denial of Service due to excessive HTML parsing",
+      "message": "Package: golang.org/x/net\nInstalled Version: 0.20.0\nVulnerability CVE-2026-25680\nSeverity: MEDIUM\nFixed Version: 0.55.0\nLink: [CVE-2026-25680](https://avd.aquasec.com/nvd/cve-2026-25680)",
+      "location": {
+        "path": "/src/go.mod",
+        "start_line": 1,
+        "end_line": 1,
+        "start_col": 1,
+        "end_col": 1
+      },
+      "source": {
+        "kind": "tool",
+        "name": "",
+        "version": "0.56.2"
+      },
+      "status": "",
+      "raw_severity": "warning",
+      "default_severity": "medium"
+    },
+    {
+      "fingerprint": "",
+      "rule_id": "CVE-2026-42502",
+      "category": "",
+      "severity": "info",
+      "title": "golang.org/x/net/html: golang: golang.org/x/net/html: Cross-Site Scripting via unexpected HTML tree rendering",
+      "message": "Package: golang.org/x/net\nInstalled Version: 0.20.0\nVulnerability CVE-2026-42502\nSeverity: MEDIUM\nFixed Version: 0.55.0\nLink: [CVE-2026-42502](https://avd.aquasec.com/nvd/cve-2026-42502)",
+      "location": {
+        "path": "/src/go.mod",
+        "start_line": 1,
+        "end_line": 1,
+        "start_col": 1,
+        "end_col": 1
+      },
+      "source": {
+        "kind": "tool",
+        "name": "",
+        "version": "0.56.2"
+      },
+      "status": "",
+      "raw_severity": "warning",
+      "default_severity": "medium"
+    },
+    {
+      "fingerprint": "",
+      "rule_id": "CVE-2026-42506",
+      "category": "",
+      "severity": "info",
+      "title": "golang.org/x/net/html: golang.org/x/net/html: Cross-Site Scripting (XSS) via arbitrary HTML parsing",
+      "message": "Package: golang.org/x/net\nInstalled Version: 0.20.0\nVulnerability CVE-2026-42506\nSeverity: MEDIUM\nFixed Version: 0.55.0\nLink: [CVE-2026-42506](https://avd.aquasec.com/nvd/cve-2026-42506)",
+      "location": {
+        "path": "/src/go.mod",
+        "start_line": 1,
+        "end_line": 1,
+        "start_col": 1,
+        "end_col": 1
+      },
+      "source": {
+        "kind": "tool",
+        "name": "",
+        "version": "0.56.2"
+      },
+      "status": "",
+      "raw_severity": "warning",
+      "default_severity": "medium"
+    },
+    {
+      "fingerprint": "",
+      "rule_id": "CVE-2026-78659",
+      "category": "",
+      "severity": "info",
+      "title": "When \u0026#34;Trailer\u0026#34; headers are sent by a client, the HTTP server internall ...",
+      "message": "Package: golang.org/x/net\nInstalled Version: 0.20.0\nVulnerability CVE-2026-78659\nSeverity: MEDIUM\nFixed Version: 0.60.0\nLink: [CVE-2026-78659](https://avd.aquasec.com/nvd/cve-2026-78659)",
+      "location": {
+        "path": "/src/go.mod",
+        "start_line": 1,
+        "end_line": 1,
+        "start_col": 1,
+        "end_col": 1
+      },
+      "source": {
+        "kind": "tool",
+        "name": "",
+        "version": "0.56.2"
+      },
+      "status": "",
+      "raw_severity": "warning",
+      "default_severity": "medium"
+    },
+    {
+      "fingerprint": "",
+      "rule_id": "CVE-2026-78660",
+      "category": "",
+      "severity": "info",
+      "title": "Historically, we have been rather lax about malformed framing-related  ...",
+      "message": "Package: golang.org/x/net\nInstalled Version: 0.20.0\nVulnerability CVE-2026-78660\nSeverity: MEDIUM\nFixed Version: 0.60.0\nLink: [CVE-2026-78660](https://avd.aquasec.com/nvd/cve-2026-78660)",
+      "location": {
+        "path": "/src/go.mod",
+        "start_line": 1,
+        "end_line": 1,
+        "start_col": 1,
+        "end_col": 1
+      },
+      "source": {
+        "kind": "tool",
+        "name": "",
+        "version": "0.56.2"
+      },
+      "status": "",
+      "raw_severity": "warning",
+      "default_severity": "medium"
+    },
+    {
+      "fingerprint": "",
+      "rule_id": "CVE-2026-78663",
+      "category": "",
+      "severity": "info",
+      "title": "net/http: net/http/internal/http2: golang: golang.org/x/net/http2: golang: flow control limit bypass via double refund in HTTP/2 server",
+      "message": "Package: golang.org/x/net\nInstalled Version: 0.20.0\nVulnerability CVE-2026-78663\nSeverity: MEDIUM\nFixed Version: 0.60.0\nLink: [CVE-2026-78663](https://avd.aquasec.com/nvd/cve-2026-78663)",
+      "location": {
+        "path": "/src/go.mod",
+        "start_line": 1,
+        "end_line": 1,
+        "start_col": 1,
+        "end_col": 1
+      },
+      "source": {
+        "kind": "tool",
+        "name": "",
+        "version": "0.56.2"
+      },
+      "status": "",
+      "raw_severity": "warning",
+      "default_severity": "medium"
+    },
+    {
+      "fingerprint": "",
+      "rule_id": "CVE-2026-97032",
+      "category": "",
+      "severity": "info",
+      "title": "net/http: net/http/internal/http2: golang: golang.org/x/net/http2: net/http: Denial of Service via concurrent HPACK encoder modification",
+      "message": "Package: golang.org/x/net\nInstalled Version: 0.20.0\nVulnerability CVE-2026-97032\nSeverity: MEDIUM\nFixed Version: 0.60.0\nLink: [CVE-2026-97032](https://avd.aquasec.com/nvd/cve-2026-97032)",
+      "location": {
+        "path": "/src/go.mod",
+        "start_line": 1,
+        "end_line": 1,
+        "start_col": 1,
+        "end_col": 1
+      },
+      "source": {
+        "kind": "tool",
+        "name": "",
+        "version": "0.56.2"
+      },
+      "status": "",
+      "raw_severity": "warning",
+      "default_severity": "medium"
     }
   ],
   "metrics": null,

@@ -3,7 +3,7 @@
   "metrics": [
     {
       "name": "tests.total",
-      "value": 3,
+      "value": 4,
       "unit": "count",
       "scope": "repo",
       "source": {
@@ -23,7 +23,7 @@
     },
     {
       "name": "tests.skipped",
-      "value": 0,
+      "value": 1,
       "unit": "count",
       "scope": "repo",
       "source": {

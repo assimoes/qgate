@@ -7,9 +7,8 @@ import (
 	"github.com/assimoes/qgate/internal/ingest/ingesttest"
 )
 
-// Fixtures follow gocover-cobertura (Go import paths, no branch data) and
-// coverage.py (branch condition coverage). Replace them with captured
-// output when the tools run in CI; see docs/DECISIONS.md.
+// The fixtures are real gocover-cobertura and coverage.py output for
+// testdata/capture/, captured by scripts/capture-fixtures.sh.
 func TestParseGolden(t *testing.T) {
 	t.Parallel()
 	ingesttest.Golden(t, cobertura.New(), "gocover.xml", "coveragepy.xml")

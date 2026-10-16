@@ -10,9 +10,8 @@ import (
 	"github.com/assimoes/qgate/internal/ingest/junit"
 )
 
-// Fixtures follow go-junit-report (subtests as test cases, skipped
-// messages) and pytest (single-line XML, setup errors as <error>). Replace
-// them with captured output when the tools run in CI; see docs/DECISIONS.md.
+// The fixtures are real go-junit-report and pytest output for
+// testdata/capture/, captured by scripts/capture-fixtures.sh.
 func TestParseGolden(t *testing.T) {
 	t.Parallel()
 	ingesttest.Golden(t, junit.New(), "gojunitreport.xml", "pytest.xml")

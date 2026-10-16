@@ -3,7 +3,7 @@
   "metrics": [
     {
       "name": "coverage.line",
-      "value": 71.43,
+      "value": 83.33,
       "unit": "percent",
       "scope": "repo",
       "source": {
@@ -13,7 +13,7 @@
     },
     {
       "name": "coverage.branch",
-      "value": 50,
+      "value": 75,
       "unit": "percent",
       "scope": "repo",
       "source": {

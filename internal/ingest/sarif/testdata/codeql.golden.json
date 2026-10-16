@@ -8,11 +8,11 @@
       "title": "Database query built from user-controlled sources",
       "message": "This query depends on a [user-provided value](1).",
       "location": {
-        "path": "internal/pay/charge.go",
-        "start_line": 52,
-        "end_line": 52,
-        "start_col": 24,
-        "end_col": 61
+        "path": "store.go",
+        "start_line": 17,
+        "end_line": 17,
+        "start_col": 18,
+        "end_col": 23
       },
       "cwe": [
         "CWE-89"
@@ -20,12 +20,12 @@
       "source": {
         "kind": "tool",
         "name": "",
-        "version": "2.19.3"
+        "version": "2.27.2"
       },
       "status": "",
       "raw_severity": "error",
       "default_severity": "high",
-      "tool_fingerprint": "primaryLocationLineHash=c7a95d84489acdf5:1;primaryLocationStartColumnFingerprint=19"
+      "tool_fingerprint": "primaryLocationLineHash=1c4bac89403e0103:1;primaryLocationStartColumnFingerprint=16"
     }
   ],
   "metrics": null,

@@ -10,9 +10,8 @@ import (
 	"github.com/assimoes/qgate/internal/ingest/ingesttest"
 )
 
-// The fixtures follow golangci-lint's and ESLint's checkstyle output (ESLint
-// writes absolute paths and an empty source for parse errors). Replace them
-// with captured output when the linters are available; see docs/DECISIONS.md.
+// The fixtures are real golangci-lint and ESLint output for
+// testdata/capture/, captured by scripts/capture-fixtures.sh.
 func TestParseGolden(t *testing.T) {
 	t.Parallel()
 	ingesttest.Golden(t, checkstyle.New(), "golangci.xml", "eslint.xml")

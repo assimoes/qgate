@@ -6,10 +6,10 @@
 
 **Status:** resolved
 
-- [ ] Repo config is discovered via flag, `QGATE_CONFIG`, then `.qgate.yaml` / `.qgate.yml`; flags beat env
-- [ ] `qgate validate --stage staging` prints the resolved config for the design doc's reference config without network access, given the environment variables it interpolates (an unset one is a config error)
-- [ ] Invalid configs exit 2 with file, dotted path and a readable message
-- [ ] Semantic checks reject unknown provider/agent/category references, duplicate input names, invalid globs and agent `kind` mismatches (exit 2)
-- [ ] `extends` resolves single inheritance; a cycle exits 2; an abstract profile can be selected with `--stage`
-- [ ] `--set path=value` overrides apply last; list merge rules (inputs by name, review rules by id, suppressions appended, agents deep-merged) are honored
-- [ ] `${VAR}` interpolation works only in schema-marked fields; API keys are only ever referenced by `api_key_env`
+- [x] Repo config is discovered via flag, `QGATE_CONFIG`, then `.qgate.yaml` / `.qgate.yml`; flags beat env
+- [x] `qgate validate --stage staging` prints the resolved config for the design doc's reference config without network access, given the environment variables it interpolates (an unset one is a config error)
+- [x] Invalid configs exit 2 with file, dotted path and a readable message
+- [x] Semantic checks reject unknown provider/agent/category references, duplicate input names, invalid globs and agent `kind` mismatches (exit 2)
+- [x] `extends` resolves single inheritance; a cycle exits 2; an abstract profile can be selected with `--stage`
+- [x] `--set path=value` overrides apply last; list merge rules (inputs by name, review rules by id, suppressions appended, agents deep-merged) are honored
+- [x] `${VAR}` interpolation works only in schema-marked fields; API keys are only ever referenced by `api_key_env`

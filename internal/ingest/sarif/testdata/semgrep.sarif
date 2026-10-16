@@ -1,69 +1,127 @@
 {
   "$schema": "https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/schemas/sarif-schema-2.1.0.json",
-  "version": "2.1.0",
   "runs": [
     {
-      "invocations": [{ "executionSuccessful": true, "toolExecutionNotifications": [] }],
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": []
+        }
+      ],
       "results": [
         {
-          "fingerprints": { "matchBasedId/v1": "3f1e0c9a7b2d6e54a8c1f0e9d7b6a5c4e3d2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6" },
+          "fingerprints": {
+            "matchBasedId/v1": "eef3bd5ade0071e42c13573a423fd3fbbdecb581d48132fb609e146992fcf730674c0e8fa8f4331bc39d5ac257e18900c092ee95fabd8f7ee20c8140518f9ac1_0"
+          },
           "locations": [
             {
               "physicalLocation": {
-                "artifactLocation": { "uri": "app/db.py", "uriBaseId": "%SRCROOT%" },
+                "artifactLocation": {
+                  "uri": "go/store.go",
+                  "uriBaseId": "%SRCROOT%"
+                },
                 "region": {
-                  "endColumn": 62, "endLine": 14, "snippet": { "text": "    cur.execute(\"SELECT * FROM users WHERE id = %s\" % uid)" },
-                  "startColumn": 5, "startLine": 14
+                  "endColumn": 24,
+                  "endLine": 17,
+                  "snippet": {
+                    "text": "\treturn db.Query(query)"
+                  },
+                  "startColumn": 9,
+                  "startLine": 17
                 }
               }
             }
           ],
-          "message": { "text": "Detected string formatting used to build a SQL query. Use parameterized queries instead." },
+          "message": {
+            "text": "SQL query built with fmt.Sprintf from user input; use a parameterized query."
+          },
           "properties": {},
-          "ruleId": "python.lang.security.audit.formatted-sql-query.formatted-sql-query"
+          "ruleId": "go-sql-from-sprintf"
         },
         {
-          "fingerprints": { "matchBasedId/v1": "9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6d" },
+          "fingerprints": {
+            "matchBasedId/v1": "5d89283dd51a98d32e85c28bacaea4519ec78fd629dacbe0540b6cb65e806769f578798ae5372a6b94a93d54b315f01507d576ab4a1f0d4572c01fe64cfe8514_0"
+          },
           "locations": [
             {
               "physicalLocation": {
-                "artifactLocation": { "uri": "app/views.py", "uriBaseId": "%SRCROOT%" },
-                "region": { "endColumn": 30, "endLine": 41, "startColumn": 9, "startLine": 40 }
+                "artifactLocation": {
+                  "uri": "js/cart.js",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "endColumn": 28,
+                  "endLine": 8,
+                  "snippet": {
+                    "text": "  console.log('total', sum)"
+                  },
+                  "startColumn": 3,
+                  "startLine": 8
+                }
               }
             }
           ],
-          "message": { "text": "Debug mode is enabled in a Flask app." },
+          "message": {
+            "text": "Remove console.log before shipping."
+          },
           "properties": {},
-          "ruleId": "python.flask.security.audit.debug-enabled.debug-enabled"
+          "ruleId": "js-console-log"
         }
       ],
       "tool": {
         "driver": {
           "name": "Semgrep OSS",
-          "semanticVersion": "1.95.0",
           "rules": [
             {
-              "defaultConfiguration": { "level": "error" },
-              "fullDescription": { "text": "Detected string formatting used to build a SQL query." },
-              "help": { "markdown": "Use parameterized queries.", "text": "Use parameterized queries." },
-              "id": "python.lang.security.audit.formatted-sql-query.formatted-sql-query",
-              "name": "python.lang.security.audit.formatted-sql-query.formatted-sql-query",
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
+                "text": "Remove console.log before shipping."
+              },
+              "help": {
+                "markdown": "Remove console.log before shipping.",
+                "text": "Remove console.log before shipping."
+              },
+              "id": "js-console-log",
+              "name": "js-console-log",
               "properties": {
                 "precision": "very-high",
-                "tags": ["CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')", "MEDIUM CONFIDENCE", "OWASP-A03:2021 - Injection", "security"]
+                "tags": []
               },
-              "shortDescription": { "text": "Semgrep Finding: python.lang.security.audit.formatted-sql-query.formatted-sql-query" }
+              "shortDescription": {
+                "text": "Semgrep Finding: js-console-log"
+              }
             },
             {
-              "defaultConfiguration": { "level": "warning" },
-              "id": "python.flask.security.audit.debug-enabled.debug-enabled",
-              "name": "python.flask.security.audit.debug-enabled.debug-enabled",
-              "properties": { "precision": "very-high", "tags": ["CWE-489: Active Debug Code", "security"] },
-              "shortDescription": { "text": "Semgrep Finding: python.flask.security.audit.debug-enabled.debug-enabled" }
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "SQL query built with fmt.Sprintf from user input; use a parameterized query."
+              },
+              "help": {
+                "markdown": "SQL query built with fmt.Sprintf from user input; use a parameterized query.",
+                "text": "SQL query built with fmt.Sprintf from user input; use a parameterized query."
+              },
+              "id": "go-sql-from-sprintf",
+              "name": "go-sql-from-sprintf",
+              "properties": {
+                "precision": "very-high",
+                "tags": [
+                  "CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')",
+                  "security"
+                ]
+              },
+              "shortDescription": {
+                "text": "Semgrep Finding: go-sql-from-sprintf"
+              }
             }
-          ]
+          ],
+          "semanticVersion": "1.95.0"
         }
       }
     }
-  ]
+  ],
+  "version": "2.1.0"
 }

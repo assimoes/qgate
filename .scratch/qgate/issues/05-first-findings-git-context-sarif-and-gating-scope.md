@@ -4,7 +4,7 @@
 
 **Blocked by:** 04 (Gate: Phase 0 acceptance)
 
-**Status:** ready-for-human
+**Status:** resolved
 
 - [x] A Seam A fixture-repo helper creates commits programmatically covering added, modified, renamed and deleted files
 - [x] `--base`/`--head` work; without them the merge-base fallback is used
@@ -13,8 +13,4 @@
 - [x] `project.include`/`exclude` are applied; binary files have no ranges
 - [x] Under `diff`, findings on unchanged lines are `out_of_scope`; file-level findings are `new` only if the file changed; `files` and `repo` behave as specified
 - [x] Fingerprints are unchanged when lines are inserted above a finding
-- [ ] Seam C golden tests (with `-update`) cover real Semgrep, CodeQL and Trivy SARIF output
-
-## Open
-
-- The Seam C goldens run against hand-written fixtures in each analyzer's SARIF shape, not captured output (Semgrep, CodeQL and Trivy were not installed). Replace `internal/ingest/sarif/testdata/{semgrep,codeql,trivy}.sarif` with real output and run `go test ./internal/ingest/sarif -update`, then tick the last box.
+- [x] Seam C golden tests (with `-update`) cover real Semgrep, CodeQL and Trivy SARIF output

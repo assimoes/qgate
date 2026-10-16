@@ -3,7 +3,7 @@
   "metrics": [
     {
       "name": "tests.total",
-      "value": 4,
+      "value": 6,
       "unit": "count",
       "scope": "repo",
       "source": {
