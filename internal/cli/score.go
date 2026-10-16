@@ -93,7 +93,7 @@ func (a app) score(cmd *cobra.Command, path string) error {
 	}
 
 	r := &model.Report{Run: saved.Run, Findings: saved.Findings, Scores: decision.Scores, Gate: decision.Gate, Warnings: saved.Warnings}
-	console := report.Console{W: a.inv.Stdout, ReproducedFrom: filepath.Base(path)}
+	console := report.Console{W: a.inv.Stdout, Color: a.color(), ReproducedFrom: filepath.Base(path)}
 	if err := console.Report(cmd.Context(), r); err != nil {
 		a.logger.Warn("console reporter failed", "error", err)
 	}

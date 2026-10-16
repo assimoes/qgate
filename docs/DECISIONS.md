@@ -201,3 +201,11 @@ CI's `self-gate` job lints qgate (golangci-lint SARIF), runs its tests with cove
 ## 2026-10-16 — Rule globs cross slashes
 
 Rule IDs are not paths, but analyzers put slashes in them (`codeql:go/sql-injection`). Every pattern matched against a rule ID or a CWE (suppression `rule`, category mapping `rule_id` and `cwe`) is a rule glob: `*` matches any run of characters including `/`, `?` one character, `[...]` a class; `codeql:*` covers every CodeQL rule. Patterns matched against file paths keep path-glob semantics. Both kinds are validated when the config loads.
+
+## 2026-10-16 — File reporters
+
+- Report formats are a registry keyed by name (`json`, `sarif`, `markdown`), each rendering the whole report to bytes; writing is shared and atomic, creating parent directories. `--output format=path` (repeatable) replaces `reporting.outputs`; the canonical JSON report is always written, at `qgate-report.json` unless an output names another path. Failing to write a JSON report is exit 3; any other reporter failing is a logged warning and never changes the exit code.
+- SARIF holds new findings only, one run per input (or agent), results sorted by rule ID, rule IDs namespaced as in the report. Each rule carries the finding's category and CWEs as tags and a `security-severity` inside its severity's band (critical 9.5, high 8.0, medium 5.5, low 2.0, info 0.0) so code scanning ranks it; each result carries the fingerprint as `partialFingerprints["qgate/v1"]`. Tests validate it against the OASIS SARIF 2.1.0 schema.
+- Markdown is the PR summary's content (design §14.3) as a file, capped at 60,000 characters on a line boundary with a pointer to the JSON report. Analyzer and agent text is escaped: no raw HTML, no `@` mentions, no table breaks. Findings show as `path:line` until CI detection (ticket 12) provides the repository URL and commit for links.
+- The console colors the outcome, failed checks and severities only when stdout is a terminal (`main` detects it and passes `Terminal` in) and `NO_COLOR` is unset; it lists the 10 most severe new findings, Markdown the top 15.
+- The self-gate job writes the Markdown summary into the GitHub job summary and uploads the SARIF with the report.

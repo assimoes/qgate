@@ -35,6 +35,15 @@ type Invocation struct {
 	Ingestors *ingest.Registry
 	// Now is the run's clock; the zero value uses the real time.
 	Now time.Time
+	// Terminal says Stdout is a terminal, which enables console color
+	// unless NO_COLOR is set.
+	Terminal bool
+}
+
+// color reports whether the console may use color.
+func (a app) color() bool {
+	_, noColor := a.inv.Env["NO_COLOR"]
+	return a.inv.Terminal && !noColor
 }
 
 // now returns the run's current time.

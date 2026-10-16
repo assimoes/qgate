@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -25,9 +24,10 @@ import (
 // output is configured, relative to the working directory.
 const DefaultReportPath = "qgate-report.json"
 
-// runFlags select what `qgate run` reviews.
+// runFlags select what `qgate run` reviews and where it reports.
 type runFlags struct {
 	base, head string
+	outputs    []string
 }
 
 func (a app) newRunCommand() *cobra.Command {
@@ -39,20 +39,25 @@ func (a app) newRunCommand() *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			started := a.inv.now()
+			outputs, err := parseOutputs(rf.outputs)
+			if err != nil {
+				return err
+			}
 			res, err := a.load(cmd, flags)
 			if err != nil {
 				return err
 			}
-			return a.runPipeline(cmd.Context(), started, res, rf)
+			return a.runPipeline(cmd.Context(), started, res, rf, outputs)
 		},
 	}
 	flags.register(cmd)
 	cmd.Flags().StringVar(&rf.base, "base", "", "base commit or ref (default: merge base with origin's default branch)")
 	cmd.Flags().StringVar(&rf.head, "head", "", "head commit or ref (default: HEAD)")
+	cmd.Flags().StringArrayVar(&rf.outputs, "output", nil, "write a report as format=path (json, sarif, markdown); repeatable; replaces reporting.outputs")
 	return cmd
 }
 
-func (a app) runPipeline(ctx context.Context, started time.Time, res *config.Resolved, rf runFlags) error {
+func (a app) runPipeline(ctx context.Context, started time.Time, res *config.Resolved, rf runFlags, flagOutputs []config.Output) error {
 	if res.RepoConfig == "" {
 		a.logger.Warn("no repo config found; only builtin policy is active")
 	}
@@ -134,13 +139,12 @@ func (a app) runPipeline(ctx context.Context, started time.Time, res *config.Res
 	}
 	r.Run.DurationMS = a.inv.now().Sub(started).Milliseconds()
 
-	// The JSON report is the canonical record: failing to write it is fatal.
-	if err := (report.JSON{Path: filepath.Join(a.inv.Dir, DefaultReportPath)}).Report(ctx, r); err != nil {
-		return err
-	}
-	// Any other reporter failing never changes the outcome.
-	if err := (report.Console{W: a.inv.Stdout}).Report(ctx, r); err != nil {
+	writeErr := a.writeReports(ctx, r, resolveOutputs(flagOutputs, cfg.Reporting.Outputs))
+	if err := (report.Console{W: a.inv.Stdout, Color: a.color()}).Report(ctx, r); err != nil {
 		a.logger.Warn("console reporter failed", "error", err)
+	}
+	if writeErr != nil {
+		return writeErr // the canonical record is missing: infrastructure failure
 	}
 	return outcomeError(cfg, r.Inputs, r.Gate.Outcome)
 }

@@ -27,12 +27,19 @@ func run() int {
 		return cli.ExitFatalRuntime
 	}
 	return cli.Execute(ctx, cli.Invocation{
-		Args:   os.Args[1:],
-		Env:    environ(),
-		Dir:    dir,
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
+		Args:     os.Args[1:],
+		Env:      environ(),
+		Dir:      dir,
+		Stdout:   os.Stdout,
+		Stderr:   os.Stderr,
+		Terminal: isTerminal(os.Stdout),
 	})
+}
+
+// isTerminal reports whether f is a character device, such as a terminal.
+func isTerminal(f *os.File) bool {
+	fi, err := f.Stat()
+	return err == nil && fi.Mode()&os.ModeCharDevice != 0
 }
 
 func environ() map[string]string {

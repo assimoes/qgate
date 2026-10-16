@@ -40,6 +40,8 @@ type Options struct {
 	Ingestors *ingest.Registry
 	// Now pins the run's clock; zero uses the real time.
 	Now time.Time
+	// Terminal says stdout is a terminal, which enables console color.
+	Terminal bool
 }
 
 // Run invokes the CLI with args and returns what it produced.
@@ -63,6 +65,7 @@ func Run(t *testing.T, opts Options, args ...string) Result {
 		HTTP:      opts.HTTP,
 		Ingestors: opts.Ingestors,
 		Now:       opts.Now,
+		Terminal:  opts.Terminal,
 	})
 	res := Result{Code: code, Stdout: stdout.String(), Stderr: stderr.String()}
 	data, err := os.ReadFile(filepath.Join(dir, cli.DefaultReportPath))
