@@ -120,7 +120,7 @@ Inputs are read and normalized in parallel, at most four at once, each into its 
 
 ## 2026-10-16 — `go.uber.org/goleak` for goroutine-leak checks
 
-CLAUDE.md requires concurrent code to be tested for goroutines outliving their tests. `goleak` (test-only) does this; `internal/cli` verifies the whole package in `TestMain`, after every test, including parallel ones, has finished.
+`CODING_STANDARDS.md` requires concurrent code to be tested for goroutines outliving their tests. `goleak` (test-only) does this; `internal/cli` verifies the whole package in `TestMain`, after every test, including parallel ones, has finished.
 
 ## 2026-10-16 — Go 1.26 is the minimum version
 
