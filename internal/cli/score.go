@@ -32,6 +32,7 @@ type savedReport struct {
 	Metrics        []model.Metric      `json:"metrics"`
 	Scores         json.RawMessage     `json:"scores"`
 	Gate           json.RawMessage     `json:"gate"`
+	Warnings       []string            `json:"warnings"`
 }
 
 func (a app) newScoreCommand() *cobra.Command {
@@ -91,7 +92,7 @@ func (a app) score(cmd *cobra.Command, path string) error {
 		return err
 	}
 
-	r := &model.Report{Run: saved.Run, Findings: saved.Findings, Scores: decision.Scores, Gate: decision.Gate}
+	r := &model.Report{Run: saved.Run, Findings: saved.Findings, Scores: decision.Scores, Gate: decision.Gate, Warnings: saved.Warnings}
 	console := report.Console{W: a.inv.Stdout, ReproducedFrom: filepath.Base(path)}
 	if err := console.Report(cmd.Context(), r); err != nil {
 		a.logger.Warn("console reporter failed", "error", err)

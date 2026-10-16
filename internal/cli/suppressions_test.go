@@ -124,10 +124,88 @@ func TestSuppressionExpiryMustBeARealDate(t *testing.T) {
 
 func TestSuppressionIsValidThroughItsExpiryDay(t *testing.T) {
 	t.Parallel()
-	today := time.Now().UTC().Format("2006-01-02")
-	repo, base := suppressionRepo(t, `  - { rule: "semgrep:sqli", reason: "until the end of today", expires: `+today+` }`, "    enforcement: advisory\n")
+	repo, base := suppressionRepo(t, `  - { rule: "semgrep:sqli", reason: "until the end of the day", expires: 2026-03-15 }`, "    enforcement: advisory\n")
+	tests := []struct {
+		now  time.Time
+		want string
+	}{
+		{time.Date(2026, 3, 15, 23, 59, 0, 0, time.UTC), "suppressed"}, // its last day
+		{time.Date(2026, 3, 16, 0, 1, 0, 0, time.UTC), "new"},          // the day after
+	}
+	for _, tt := range tests {
+		res := clitest.Run(t, clitest.Options{Dir: repo.Dir, Now: tt.now}, "run", "--base", base)
+		if got := statusByKey(t, res)["semgrep:sqli@a.go"]["status"]; got != tt.want {
+			t.Errorf("at %s: status = %v, want %s", tt.now, got, tt.want)
+		}
+	}
+}
+
+func TestRuleGlobsCrossSlashes(t *testing.T) {
+	t.Parallel()
+	repo, base, _ := history(t)
+	repo.Write("c.sarif", sarifLog(map[string][]sarifResult{"CodeQL": {
+		{rule: "go/sql-injection", level: "error", path: "a.go", line: 5},
+		{rule: "go/log-injection", level: "error", path: "new.go", line: 1},
+		{rule: "js/xss", level: "error", path: "a.go", line: 5},
+	}}))
+	repo.Write(".qgate.yaml", `version: 1
+inputs:
+  - { name: codeql, format: sarif, path: c.sarif }
+category_mappings:
+  - { match: { rule_id: "codeql:*injection" }, category: security }
+suppressions:
+  - { rule: "codeql:js/*", reason: "frontend is out of scope here" }
+`)
+	got := statusByKey(t, clitest.Run(t, clitest.Options{Dir: repo.Dir}, "run", "--base", base))
+	for k, cat := range map[string]string{"codeql:go/sql-injection@a.go": "security", "codeql:go/log-injection@new.go": "security"} {
+		if got[k]["category"] != cat {
+			t.Errorf("%s category = %v, want %s: * must cross /", k, got[k]["category"], cat)
+		}
+	}
+	if got["codeql:js/xss@a.go"]["status"] != "suppressed" {
+		t.Errorf("js/xss = %v, want suppressed", got["codeql:js/xss@a.go"]["status"])
+	}
+
+	// "codeql:*" covers every rule of the input.
+	repo.Write(".qgate.yaml", "version: 1\ninputs:\n  - { name: codeql, format: sarif, path: c.sarif }\nsuppressions:\n  - { rule: \"codeql:*\", reason: all }\n")
+	for k, f := range statusByKey(t, clitest.Run(t, clitest.Options{Dir: repo.Dir}, "run", "--base", base)) {
+		if f["status"] != "suppressed" {
+			t.Errorf("%s = %v, want suppressed by codeql:*", k, f["status"])
+		}
+	}
+}
+
+func TestExpiredSuppressionWarningsAreCanonical(t *testing.T) {
+	t.Parallel()
+	order := func(first, second string) []any {
+		repo, base := suppressionRepo(t, first+"\n"+second+"\n"+first, "    enforcement: advisory\n")
+		res := clitest.Run(t, clitest.Options{Dir: repo.Dir}, "run", "--base", base)
+		return res.DecodeReport(t)["warnings"].([]any)
+	}
+	a := `  - { rule: "semgrep:sqli", reason: "legacy", expires: 2000-01-31 }`
+	b := `  - { rule: "semgrep:xss", reason: "legacy", expires: 2000-02-28 }`
+	one, two := order(a, b), order(b, a)
+	if fmt.Sprint(one) != fmt.Sprint(two) {
+		t.Errorf("warnings depend on config order:\n%v\n%v", one, two)
+	}
+	if len(one) != 2 {
+		t.Errorf("warnings = %v, want 2 (the repeated suppression once)", one)
+	}
+	if strings.Contains(fmt.Sprint(one), "suppression 0") || strings.Contains(fmt.Sprint(one), "suppression 1") {
+		t.Errorf("warnings = %v, want no list positions", one)
+	}
+}
+
+func TestScoreShowsASavedReportsWarnings(t *testing.T) {
+	t.Parallel()
+	repo, base := suppressionRepo(t, `  - { rule: "semgrep:sqli", reason: "temporary", expires: 2000-01-31 }`, "    enforcement: advisory\n")
 	res := clitest.Run(t, clitest.Options{Dir: repo.Dir}, "run", "--base", base)
-	if got := statusByKey(t, res)["semgrep:sqli@a.go"]["status"]; got != "suppressed" {
-		t.Errorf("status = %v, want suppressed on its expiry day", got)
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "r.json"), res.Report, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	again := clitest.Run(t, clitest.Options{Dir: dir}, "score", "--report", "r.json")
+	if !strings.Contains(again.Stdout, "Warning:") || !strings.Contains(again.Stdout, "expired") {
+		t.Errorf("score --report does not show the saved warnings:\n%s", again.Stdout)
 	}
 }

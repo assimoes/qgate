@@ -227,12 +227,46 @@ type ReviewRule struct {
 // ExpiryLayout is how suppressions write their expiry date (UTC).
 const ExpiryLayout = "2006-01-02"
 
+// Date is a calendar date in UTC, written as ExpiryLayout. The zero Date
+// means none was given.
+type Date struct{ t time.Time }
+
+// UnmarshalJSON parses an ExpiryLayout date.
+func (d *Date) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return fmt.Errorf("date: %w", err)
+	}
+	t, err := time.Parse(ExpiryLayout, s)
+	if err != nil {
+		return fmt.Errorf("date: %w", err)
+	}
+	*d = Date{t}
+	return nil
+}
+
+// IsZero reports whether no date was given.
+func (d Date) IsZero() bool { return d.t.IsZero() }
+
+// String formats the date as ExpiryLayout.
+func (d Date) String() string { return d.t.Format(ExpiryLayout) }
+
+// ExpiredAt reports whether the date has passed at now: a date is valid
+// through its whole day in UTC. A zero Date never expires.
+func (d Date) ExpiredAt(now time.Time) bool {
+	if d.IsZero() {
+		return false
+	}
+	y, m, day := now.UTC().Date()
+	return d.t.Before(time.Date(y, m, day, 0, 0, 0, 0, time.UTC))
+}
+
 // Suppression excuses findings matching a rule and path, with a reason.
 type Suppression struct {
 	Rule    string   `json:"rule"`
 	Paths   []string `json:"paths"`
 	Reason  string   `json:"reason"`
-	Expires string   `json:"expires"` // ExpiryLayout; valid through that day
+	Expires Date     `json:"expires"` // valid through that day; zero for no expiry
 }
 
 // Baseline points at a baseline file.

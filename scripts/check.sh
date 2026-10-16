@@ -9,6 +9,14 @@ GOLANGCI_LINT_VERSION=v2.13.2
 
 step() { printf '\n== %s\n' "$1"; }
 
+step "file sizes"
+# A runaway edit once inflated a 25 KB doc to 49 MB; no tracked file here
+# is legitimately over 1 MiB.
+big=$(git ls-files -z | xargs -0 -I{} sh -c 'test -f "{}" && test $(wc -c < "{}") -gt 1048576 && echo "{}"' || true)
+if [ -n "$big" ]; then
+  echo "tracked files over 1 MiB:"; echo "$big"; exit 1
+fi
+
 step "go mod tidy"
 go mod tidy -diff
 

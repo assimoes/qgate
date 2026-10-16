@@ -38,7 +38,7 @@ func (a app) newRunCommand() *cobra.Command {
 		Short: "Run the full quality gate pipeline",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			started := time.Now()
+			started := a.inv.now()
 			res, err := a.load(cmd, flags)
 			if err != nil {
 				return err
@@ -77,13 +77,13 @@ func (a app) runPipeline(ctx context.Context, started time.Time, res *config.Res
 			Registry:   a.inv.Ingestors,
 			Dir:        a.inv.Dir,
 			Env:        a.inv.Env,
-			Today:      started,
 			Workspaces: gc.Workspaces,
 		}, cfg, gc)
 		if err != nil {
 			return err
 		}
 	}
+	findings, warnings := pipeline.Excuse(inputs.Findings, cfg, started)
 
 	runID, err := newRunID()
 	if err != nil {
@@ -96,7 +96,7 @@ func (a app) runPipeline(ctx context.Context, started time.Time, res *config.Res
 	}
 	hash := sha256.Sum256(resolved)
 	decision, err := pipeline.Decide(pipeline.Evidence{
-		Findings: inputs.Findings, Metrics: inputs.Metrics,
+		Findings: findings, Metrics: inputs.Metrics,
 		Inputs: inputs.Statuses, Degraded: pipeline.Degraded(inputs.Statuses),
 	}, cfg)
 	if err != nil {
@@ -122,17 +122,17 @@ func (a app) runPipeline(ctx context.Context, started time.Time, res *config.Res
 		Scoring:        model.Scoring{Version: cfg.Scoring.Version, Params: scoringParams},
 		Inputs:         inputs.Statuses,
 		Agents:         []model.AgentStatus{},
-		Findings:       inputs.Findings,
+		Findings:       findings,
 		Metrics:        inputs.Metrics,
 		Scores:         decision.Scores,
 		Gate:           decision.Gate,
 		DataEgress:     []model.Egress{},
-		Warnings:       nonNilStrings(inputs.Warnings),
+		Warnings:       nonNilStrings(warnings),
 	}
 	if gc != nil {
 		r.Run.BaseSHA, r.Run.HeadSHA = gc.BaseSHA, gc.HeadSHA
 	}
-	r.Run.DurationMS = time.Since(started).Milliseconds()
+	r.Run.DurationMS = a.inv.now().Sub(started).Milliseconds()
 
 	// The JSON report is the canonical record: failing to write it is fatal.
 	if err := (report.JSON{Path: filepath.Join(a.inv.Dir, DefaultReportPath)}).Report(ctx, r); err != nil {

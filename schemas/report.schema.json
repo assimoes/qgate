@@ -6,7 +6,7 @@
   "type": "object",
   "required": [
     "schema_version", "qgate_version", "run", "config_hash", "resolved_config",
-    "scoring", "inputs", "agents", "findings", "metrics", "scores", "gate", "data_egress", "warnings"
+    "scoring", "inputs", "agents", "findings", "metrics", "scores", "gate", "data_egress"
   ],
   "properties": {
     "schema_version": { "const": 1 },

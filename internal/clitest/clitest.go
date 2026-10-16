@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/assimoes/qgate/internal/cli"
 	"github.com/assimoes/qgate/internal/ingest"
@@ -37,6 +38,8 @@ type Options struct {
 	Context context.Context
 	// Ingestors replaces the builtin report formats; nil uses them.
 	Ingestors *ingest.Registry
+	// Now pins the run's clock; zero uses the real time.
+	Now time.Time
 }
 
 // Run invokes the CLI with args and returns what it produced.
@@ -59,6 +62,7 @@ func Run(t *testing.T, opts Options, args ...string) Result {
 		Stderr:    &stderr,
 		HTTP:      opts.HTTP,
 		Ingestors: opts.Ingestors,
+		Now:       opts.Now,
 	})
 	res := Result{Code: code, Stdout: stdout.String(), Stderr: stderr.String()}
 	data, err := os.ReadFile(filepath.Join(dir, cli.DefaultReportPath))

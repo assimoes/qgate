@@ -16,10 +16,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/bmatcuk/doublestar/v4"
-
 	"github.com/assimoes/qgate/internal/config"
 	"github.com/assimoes/qgate/internal/gitctx"
+	"github.com/assimoes/qgate/internal/glob"
 	"github.com/assimoes/qgate/internal/ingest"
 	"github.com/assimoes/qgate/internal/model"
 )
@@ -158,25 +157,18 @@ func assignCategories(fs []ingest.Finding, mappings []config.CategoryMapping, fa
 // sets. Rule IDs are matched after namespacing; cwe matches any of the
 // finding's CWEs, and "*" any finding that has one.
 func matches(m config.CategoryMatch, f model.Finding) bool {
-	if m.RuleID != "" && !glob(m.RuleID, f.RuleID) {
+	if m.RuleID != "" && !glob.Rule(m.RuleID, f.RuleID) {
 		return false
 	}
-	if m.Path != "" && !glob(m.Path, f.Location.Path) {
+	if m.Path != "" && !glob.Path(m.Path, f.Location.Path) {
 		return false
 	}
 	if m.CWE != "" {
 		// CWE IDs are normalized to "CWE-<n>"; patterns match regardless of case.
 		pattern := strings.ToUpper(m.CWE)
-		return slices.ContainsFunc(f.CWE, func(c string) bool { return glob(pattern, strings.ToUpper(c)) })
+		return slices.ContainsFunc(f.CWE, func(c string) bool { return glob.Rule(pattern, strings.ToUpper(c)) })
 	}
 	return true
-}
-
-// glob matches with doublestar semantics; patterns were validated when the
-// config was loaded.
-func glob(pattern, s string) bool {
-	ok, _ := doublestar.Match(pattern, s)
-	return ok
 }
 
 // fingerprint gives each finding a stable identity that survives lines

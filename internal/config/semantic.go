@@ -5,8 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bmatcuk/doublestar/v4"
-
+	"github.com/assimoes/qgate/internal/glob"
 	"github.com/assimoes/qgate/internal/model"
 	"github.com/assimoes/qgate/internal/prompts"
 )
@@ -254,12 +253,17 @@ func (c *checker) agentKinds() {
 	})
 }
 
+// globs rejects malformed patterns: path globs where config names paths,
+// rule globs where it names rule IDs or CWEs (see the glob package).
 func (c *checker) globs() {
-	check := func(p path, v any) {
-		if s, ok := v.(string); ok && !doublestar.ValidatePattern(s) {
-			c.fail(p, "invalid glob %q", s)
+	checkWith := func(valid func(string) bool) func(p path, v any) {
+		return func(p path, v any) {
+			if s, ok := v.(string); ok && !valid(s) {
+				c.fail(p, "invalid glob %q", s)
+			}
 		}
 	}
+	check, checkRule := checkWith(glob.ValidPath), checkWith(glob.ValidRule)
 	checkList := func(p path, l []any) {
 		for i, v := range l {
 			check(p.index(i), v)
@@ -278,15 +282,15 @@ func (c *checker) globs() {
 			m, _ := it.(map[string]any)
 			checkList(path{list}.index(i).key("paths"), listAt(m, "paths"))
 			if list == "suppressions" {
-				check(path{list}.index(i).key("rule"), m["rule"])
+				checkRule(path{list}.index(i).key("rule"), m["rule"])
 			}
 		}
 	}
 	for i, cm := range listAt(c.doc, "category_mappings") {
 		m, _ := cm.(map[string]any)
 		match, _ := m["match"].(map[string]any)
-		for _, k := range []string{"rule_id", "path", "cwe"} {
-			check(path{"category_mappings"}.index(i).key("match").key(k), match[k])
-		}
+		checkRule(path{"category_mappings"}.index(i).key("match").key("rule_id"), match["rule_id"])
+		check(path{"category_mappings"}.index(i).key("match").key("path"), match["path"])
+		checkRule(path{"category_mappings"}.index(i).key("match").key("cwe"), match["cwe"])
 	}
 }

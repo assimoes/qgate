@@ -33,6 +33,16 @@ type Invocation struct {
 	HTTP *http.Client
 	// Ingestors are the report formats qgate reads; nil uses the builtin ones.
 	Ingestors *ingest.Registry
+	// Now is the run's clock; the zero value uses the real time.
+	Now time.Time
+}
+
+// now returns the run's current time.
+func (inv Invocation) now() time.Time {
+	if !inv.Now.IsZero() {
+		return inv.Now
+	}
+	return time.Now()
 }
 
 // defaultHTTPTimeout bounds each outbound request when the invocation did
