@@ -12,3 +12,7 @@
 - [x] Exit codes 0/1/2/3 are defined in one place and an unknown command or flag exits 2
 - [x] A Seam A test helper invokes the CLI in-process and captures exit code, stdout, stderr and the written report
 - [x] CI runs `go vet`, `staticcheck` and `go test -race` and is green
+
+## Verification
+
+CI on `github.com/assimoes/qgate` has run the workflow since 2026-10-16: the first run (38922188088, commit 5bcceff) passed `scripts/check.sh` (gofmt, vet and staticcheck through golangci-lint, `go test -race`) and the static build, and every push since has been green.
